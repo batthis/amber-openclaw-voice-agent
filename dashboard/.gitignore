@@ -1,0 +1,5 @@
+# Generated data files
+data/
+
+# Personal contacts (contains phone numbers/names)
+contacts.json
