@@ -123,7 +123,7 @@ The built-in dashboard provides a real-time web UI for browsing your call histor
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `TWILIO_CALLER_ID` | *(required)* | Your Twilio number — used to detect call direction |
-| `ASSISTANT_NAME` | `Assistant` | Name shown for the voice agent in call logs |
+| `ASSISTANT_NAME` | `Amber` | Name shown for the voice agent in call logs |
 | `OPERATOR_NAME` | `the operator` | Name used in call summaries (e.g. "message passed to...") |
 | `CONTACTS_FILE` | `./contacts.json` | Optional phone→name mapping file |
 | `LOGS_DIR` | `../runtime/logs` | Directory containing call log files |
