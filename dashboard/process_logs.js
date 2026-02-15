@@ -6,15 +6,69 @@ const os = require('os');
 
 const HOME = process.env.HOME || os.homedir();
 
+// ─── Security Helpers ───
+
+/**
+ * Validate that a path stays within the expected base directory.
+ * Throws if path escapes the base.
+ */
+function safePath(basePath, userPath) {
+  const base = path.resolve(basePath);
+  const resolved = path.resolve(base, userPath);
+
+  if (!resolved.startsWith(base + path.sep) && resolved !== base) {
+    throw new Error(`Path traversal attempt blocked: ${userPath}`);
+  }
+
+  return resolved;
+}
+
 // Configuration via environment variables with sensible defaults
 const TWILIO_NUMBER = process.env.TWILIO_CALLER_ID || '';
 const ASSISTANT_NAME = process.env.ASSISTANT_NAME || 'Assistant';
 const OPERATOR_NAME = process.env.OPERATOR_NAME || 'the operator';
 
-// Paths - default to relative paths for portability
-const DEFAULT_LOGS_DIR = process.env.LOGS_DIR || path.join(__dirname, '../runtime/logs');
-const DEFAULT_OUTPUT_DIR = process.env.OUTPUT_DIR || path.join(__dirname, 'data');
-const CONTACTS_FILE = process.env.CONTACTS_FILE || path.join(__dirname, 'contacts.json');
+// Paths - validate to prevent path traversal
+const SKILL_ROOT = path.resolve(__dirname, '..');
+
+const DEFAULT_LOGS_DIR = (() => {
+  const userPath = process.env.LOGS_DIR;
+  const defaultPath = path.join(__dirname, '../runtime/logs');
+  if (!userPath) return defaultPath;
+  
+  try {
+    return safePath(SKILL_ROOT, userPath);
+  } catch (e) {
+    console.warn(`LOGS_DIR validation failed (${userPath}), using default:`, e.message);
+    return defaultPath;
+  }
+})();
+
+const DEFAULT_OUTPUT_DIR = (() => {
+  const userPath = process.env.OUTPUT_DIR;
+  const defaultPath = path.join(__dirname, 'data');
+  if (!userPath) return defaultPath;
+  
+  try {
+    return safePath(SKILL_ROOT, userPath);
+  } catch (e) {
+    console.warn(`OUTPUT_DIR validation failed (${userPath}), using default:`, e.message);
+    return defaultPath;
+  }
+})();
+
+const CONTACTS_FILE = (() => {
+  const userPath = process.env.CONTACTS_FILE;
+  const defaultPath = path.join(__dirname, 'contacts.json');
+  if (!userPath) return defaultPath;
+  
+  try {
+    return safePath(SKILL_ROOT, userPath);
+  } catch (e) {
+    console.warn(`CONTACTS_FILE validation failed (${userPath}), using default:`, e.message);
+    return defaultPath;
+  }
+})();
 
 // Load contacts from file (optional)
 let KNOWN_NUMBERS = {};
@@ -38,9 +92,19 @@ function parseArgs(argv) {
     for (let i = 2; i < argv.length; i++) {
         const a = argv[i];
         if (a === '--logs' && argv[i + 1]) {
-            args.logsDir = argv[++i];
+            const userPath = argv[++i];
+            try {
+                args.logsDir = safePath(SKILL_ROOT, userPath);
+            } catch (e) {
+                console.warn(`--logs path validation failed (${userPath}), using default:`, e.message);
+            }
         } else if (a === '--out' && argv[i + 1]) {
-            args.outputDir = argv[++i];
+            const userPath = argv[++i];
+            try {
+                args.outputDir = safePath(SKILL_ROOT, userPath);
+            } catch (e) {
+                console.warn(`--out path validation failed (${userPath}), using default:`, e.message);
+            }
         } else if (a === '--no-sample') {
             args.writeSample = false;
         } else if (a === '-h' || a === '--help') {

@@ -4,6 +4,25 @@ const path = require('path');
 
 const { processLogsWithOptions } = require('../process_logs');
 
+// ─── Security Helpers ───
+
+/**
+ * Validate that a path stays within the expected base directory.
+ * Throws if path escapes the base.
+ */
+function safePath(basePath, userPath) {
+  const base = path.resolve(basePath);
+  const resolved = path.resolve(base, userPath);
+
+  if (!resolved.startsWith(base + path.sep) && resolved !== base) {
+    throw new Error(`Path traversal attempt blocked: ${userPath}`);
+  }
+
+  return resolved;
+}
+
+const SKILL_ROOT = path.resolve(__dirname, '../..');
+
 function parseArgs(argv) {
   const args = {
     logsDir: null,
@@ -13,10 +32,25 @@ function parseArgs(argv) {
 
   for (let i = 2; i < argv.length; i++) {
     const a = argv[i];
-    if (a === '--logs' && argv[i + 1]) args.logsDir = argv[++i];
-    else if (a === '--out' && argv[i + 1]) args.outputDir = argv[++i];
-    else if (a === '--interval-ms' && argv[i + 1]) args.intervalMs = Number(argv[++i]);
-    else if (a === '-h' || a === '--help') args.help = true;
+    if (a === '--logs' && argv[i + 1]) {
+      const userPath = argv[++i];
+      try {
+        args.logsDir = safePath(SKILL_ROOT, userPath);
+      } catch (e) {
+        console.warn(`--logs path validation failed (${userPath}), ignoring:`, e.message);
+      }
+    } else if (a === '--out' && argv[i + 1]) {
+      const userPath = argv[++i];
+      try {
+        args.outputDir = safePath(SKILL_ROOT, userPath);
+      } catch (e) {
+        console.warn(`--out path validation failed (${userPath}), ignoring:`, e.message);
+      }
+    } else if (a === '--interval-ms' && argv[i + 1]) {
+      args.intervalMs = Number(argv[++i]);
+    } else if (a === '-h' || a === '--help') {
+      args.help = true;
+    }
   }
 
   return args;

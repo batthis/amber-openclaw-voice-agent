@@ -4,9 +4,67 @@ import bodyParser from 'body-parser';
 import express, { type Request, type Response } from 'express';
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import OpenAI from 'openai';
 import WebSocket from 'ws';
 import twilio from 'twilio';
+
+// ─── Security Helpers ───
+
+/**
+ * Verify OpenAI webhook signature using HMAC-SHA256.
+ * OpenAI sends header: openai-signature containing v1=<hex-encoded HMAC-SHA256>
+ */
+function verifyWebhookSignature(rawBody: Buffer, signatureHeader: string, secret: string): boolean {
+  try {
+    if (!signatureHeader || !secret) return false;
+
+    // Extract v1=... value from header
+    const match = signatureHeader.match(/v1=([a-f0-9]+)/);
+    if (!match) return false;
+    const providedSignature = match[1];
+
+    // Compute HMAC-SHA256 of raw body
+    const hmac = crypto.createHmac('sha256', secret);
+    hmac.update(rawBody);
+    const computedSignature = hmac.digest('hex');
+
+    // Use timing-safe comparison
+    if (providedSignature.length !== computedSignature.length) return false;
+    return crypto.timingSafeEqual(
+      Buffer.from(providedSignature, 'hex'),
+      Buffer.from(computedSignature, 'hex')
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Validate that a path stays within the expected base directory.
+ * Throws if path escapes the base.
+ */
+function safePath(basePath: string, userPath: string): string {
+  const base = path.resolve(basePath);
+  const resolved = path.resolve(base, userPath);
+
+  if (!resolved.startsWith(base + path.sep) && resolved !== base) {
+    throw new Error(`Path traversal attempt blocked: ${userPath}`);
+  }
+
+  return resolved;
+}
+
+/**
+ * Sanitize environment variable values used in LLM prompts.
+ * Strips dangerous characters and truncates to prevent prompt injection.
+ */
+function sanitizeEnvName(value: string, maxLen = 50): string {
+  if (!value) return '';
+  // Allow alphanumeric, spaces, hyphens, apostrophes, periods
+  const cleaned = value.replace(/[^a-zA-Z0-9\s'\-\.]/g, '');
+  return cleaned.slice(0, maxLen);
+}
 
 const PORT = Number(process.env.PORT ?? 8000);
 const PUBLIC_BASE_URL = mustGetEnv('PUBLIC_BASE_URL');
@@ -24,9 +82,9 @@ const OPENAI_VOICE = process.env.OPENAI_VOICE ?? 'alloy';
 const OPENCLAW_GATEWAY_URL = process.env.OPENCLAW_GATEWAY_URL ?? 'http://127.0.0.1:18789';
 const OPENCLAW_GATEWAY_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN ?? '';
 
-// Configurable operator/assistant info
-const ASSISTANT_NAME = process.env.ASSISTANT_NAME ?? 'Amber';
-const OPERATOR_NAME = process.env.OPERATOR_NAME ?? 'your operator';
+// Configurable operator/assistant info (sanitized to prevent prompt injection)
+const ASSISTANT_NAME = sanitizeEnvName(process.env.ASSISTANT_NAME ?? 'Amber');
+const OPERATOR_NAME = sanitizeEnvName(process.env.OPERATOR_NAME ?? 'your operator');
 const OPERATOR_PHONE = process.env.OPERATOR_PHONE ?? '';
 const OPERATOR_EMAIL = process.env.OPERATOR_EMAIL ?? '';
 const ORG_NAME = process.env.ORG_NAME ?? '';
@@ -35,8 +93,20 @@ const DEFAULT_CALENDAR = process.env.DEFAULT_CALENDAR ?? '';
 // Configurable GenZ caller numbers (comma-separated E.164 numbers)
 const GENZ_NUMBERS = (process.env.GENZ_CALLER_NUMBERS ?? '').split(',').map(s => s.trim()).filter(Boolean);
 
-// Configurable outbound map path
-const OUTBOUND_MAP_PATH = process.env.OUTBOUND_MAP_PATH ?? path.join(process.cwd(), 'data', 'bridge-outbound-map.json');
+// Configurable outbound map path (validated to prevent path traversal)
+const OUTBOUND_MAP_PATH = (() => {
+  const userPath = process.env.OUTBOUND_MAP_PATH;
+  const defaultPath = path.join(process.cwd(), 'data', 'bridge-outbound-map.json');
+  
+  if (!userPath) return defaultPath;
+  
+  try {
+    return safePath(process.cwd(), userPath);
+  } catch (e) {
+    console.warn(`OUTBOUND_MAP_PATH validation failed (${userPath}), using default:`, e instanceof Error ? e.message : String(e));
+    return defaultPath;
+  }
+})();
 
 // ─── Phase C2: OpenClaw brain-in-loop tool definitions ───
 const OPENCLAW_TOOLS = [
@@ -297,10 +367,20 @@ app.post('/twiml/bridge', async (req: Request, res: Response) => {
  */
 app.post('/openai/webhook', async (req: Request, res: Response) => {
   try {
-    // NOTE: OpenAI's official Node SDK used to expose webhook verification helpers, but the installed
-    // version in this project does not. For now we parse the event without verification.
-    // If you want signature verification, we can add it once we confirm the exact header scheme.
-    const event = JSON.parse(req.body.toString('utf8'));
+    // Verify webhook signature (CRITICAL security requirement)
+    const signatureHeader = req.headers['openai-signature'] as string | undefined;
+    const rawBody = req.body as Buffer;
+
+    if (!verifyWebhookSignature(rawBody, signatureHeader || '', OPENAI_WEBHOOK_SECRET)) {
+      console.error('WEBHOOK_SIGNATURE_VERIFICATION_FAILED', {
+        hasSignature: !!signatureHeader,
+        hasSecret: !!OPENAI_WEBHOOK_SECRET,
+        bodyLength: rawBody.length
+      });
+      return res.status(401).send('Unauthorized: Invalid signature');
+    }
+
+    const event = JSON.parse(rawBody.toString('utf8'));
 
     if (event?.type !== 'realtime.call.incoming') {
       return res.sendStatus(200);
