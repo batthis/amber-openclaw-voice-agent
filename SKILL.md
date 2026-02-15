@@ -23,7 +23,7 @@ Amber handles inbound call screening, outbound calls, appointment booking, live 
 
 ## Why Amber
 
-- **Ship a voice agent in minutes** — `npm install`, configure `.env`, `npm start`
+- **Launch a voice agent in minutes** — `npm install`, configure `.env`, `npm start`
 - Full inbound screening: greeting, message-taking, appointment booking with calendar integration
 - Outbound calls with structured call plans (reservations, inquiries, follow-ups)
 - **`ask_openclaw` tool** — voice agent consults your OpenClaw gateway mid-call for calendar, contacts, preferences
@@ -143,6 +143,14 @@ See `dashboard/README.md` for full documentation.
 - Never publish secrets, tokens, phone numbers, webhook URLs with credentials, or personal data.
 - Include explicit safety rules for outbound calls, payments, and escalation.
 - Mark V1 as beta if conversational quality/latency tuning is ongoing.
+
+## Support & Contributing
+
+Found a bug? Have a feature request? Want to contribute?
+
+- **Issues & feature requests:** [GitHub Issues](https://github.com/batthis/amber-openclaw-voice-agent/issues)
+- **Source code:** [github.com/batthis/amber-openclaw-voice-agent](https://github.com/batthis/amber-openclaw-voice-agent)
+- **Pull requests welcome** — fork the repo, make your changes, and submit a PR.
 
 ## Resources
 
