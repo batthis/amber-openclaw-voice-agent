@@ -25,7 +25,7 @@ function safePath(basePath, userPath) {
 
 // Configuration via environment variables with sensible defaults
 const TWILIO_NUMBER = process.env.TWILIO_CALLER_ID || '';
-const ASSISTANT_NAME = process.env.ASSISTANT_NAME || 'Assistant';
+const ASSISTANT_NAME = process.env.ASSISTANT_NAME || 'Amber';
 const OPERATOR_NAME = process.env.OPERATOR_NAME || 'the operator';
 
 // Paths - validate to prevent path traversal
@@ -522,7 +522,7 @@ if (require.main === module) {
         console.log('');
         console.log('Environment variables:');
         console.log('  TWILIO_CALLER_ID    - Twilio phone number (required for direction detection)');
-        console.log('  ASSISTANT_NAME      - Name of the voice assistant (default: "Assistant")');
+        console.log('  ASSISTANT_NAME      - Name of the voice assistant (default: "Amber")');
         console.log('  OPERATOR_NAME       - Name of the operator/owner (default: "the operator")');
         console.log('  LOGS_DIR            - Directory containing call logs (default: ../runtime/logs)');
         console.log('  OUTPUT_DIR          - Directory for processed data (default: ./data)');
