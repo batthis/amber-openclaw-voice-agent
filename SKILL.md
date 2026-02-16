@@ -28,6 +28,7 @@ Amber handles inbound call screening, outbound calls, appointment booking, live 
 - Outbound calls with structured call plans (reservations, inquiries, follow-ups)
 - **`ask_openclaw` tool** — voice agent consults your OpenClaw gateway mid-call for calendar, contacts, preferences
 - **Call log dashboard** — browse call history, read transcripts, track follow-ups, search by caller/number/content
+- **Automatic language detection** — Amber detects the caller's language and switches naturally mid-call (supports Arabic, Spanish, French, and more via OpenAI Realtime)
 - VAD tuning + verbal fillers to keep conversations natural (no dead air during lookups)
 - Fully configurable: assistant name, operator info, org name, calendar, screening style — all via env vars
 - Operator safety guardrails for approvals/escalation/payment handling
