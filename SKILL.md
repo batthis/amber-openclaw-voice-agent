@@ -115,7 +115,6 @@ To avoid dead air while waiting for OpenClaw to respond, Amber automatically say
 | `OPENAI_VOICE` | `alloy` | OpenAI TTS voice (`alloy`, `echo`, `fable`, `onyx`, `nova`, `shimmer`) |
 | `GENZ_CALLER_NUMBERS` | *(empty)* | Comma-separated list of E.164 numbers that should get Gen Z-style screening |
 | `OUTBOUND_MAP_PATH` | `<cwd>/data/bridge-outbound-map.json` | Path for storing outbound call metadata |
-| `DASHBOARD_PROCESSOR_PATH` | *(disabled)* | Path to `process_logs.js` — enables auto-refresh after each call |
 
 ### Security notes
 
@@ -232,7 +231,6 @@ The built-in dashboard provides a real-time web UI for browsing your call histor
 | `LOGS_DIR` | `../runtime/logs` | Directory containing call log files |
 | `OUTPUT_DIR` | `./data` | Where processed JSON is written |
 | `BRIDGE_OUTBOUND_MAP` | `<LOGS_DIR>/bridge-outbound-map.json` | Path to bridge outbound map (resolves To numbers & objectives) |
-| `DASHBOARD_PROCESSOR_PATH` | *(disabled)* | Path to `process_logs.js` — enables auto-refresh after each call |
 
 See `dashboard/README.md` for full documentation.
 

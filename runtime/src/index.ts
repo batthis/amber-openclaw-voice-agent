@@ -777,24 +777,14 @@ const callAccept = {
       await Promise.all([endStream(jsonlStream), endStream(transcriptStream)]);
       await finalizeSummaryFromTranscript(callId);
 
-      // Auto-refresh call log dashboard after every call.
-      // Set DASHBOARD_PROCESSOR_PATH env var to enable (e.g., /path/to/dashboard/process_logs.js).
-      // Disabled by default — no child_process exec without explicit opt-in.
-      const dashboardScript = process.env.DASHBOARD_PROCESSOR_PATH;
-      if (dashboardScript && fs.existsSync(dashboardScript)) {
-        try {
-          const { execFile } = await import('child_process');
-          execFile('node', [dashboardScript], {
-            env: { ...process.env, TWILIO_CALLER_ID: process.env.TWILIO_CALLER_ID || '' },
-            timeout: 30000,
-          }, (err) => {
-            if (err) console.error('Dashboard auto-refresh failed:', err.message);
-            else console.log('Dashboard auto-refreshed after call', callId);
-          });
-        } catch (dashErr: any) {
-          console.error('Dashboard auto-refresh error:', dashErr.message);
-        }
-      }
+      // Dashboard auto-refresh: the bridge writes a marker file after each call.
+      // Use an external file watcher or cron job to trigger process_logs.js when this file changes.
+      // This avoids child_process.exec in the runtime (no RCE surface).
+      try {
+        const markerPath = path.join(logsDir(), '.last-call-completed');
+        fs.writeFileSync(markerPath, JSON.stringify({ callId, completedAt: new Date().toISOString() }) + '\n', 'utf8');
+      } catch {}
+
     });
 
     // Always ack the webhook quickly.
