@@ -33,6 +33,70 @@ Amber handles inbound call screening, outbound calls, appointment booking, live 
 - Fully configurable: assistant name, operator info, org name, calendar, screening style — all via env vars
 - Operator safety guardrails for approvals/escalation/payment handling
 
+## How tool calling works (`ask_openclaw`)
+
+Amber isn't just a voice bot reading a script — she can consult your OpenClaw instance mid-call to answer questions she doesn't know from her instructions alone.
+
+### The flow
+
+```
+Caller asks a question
+        ↓
+Amber (OpenAI Realtime) decides she needs more info
+        ↓
+Amber says "One moment, let me check on that for you"
+        ↓
+Amber calls the `ask_openclaw` tool with a short question
+        ↓
+Bridge sends the question to your OpenClaw gateway
+  (via POST /v1/chat/completions on localhost)
+        ↓
+OpenClaw checks calendar, contacts, memory, etc.
+        ↓
+Response comes back → Amber speaks the answer to the caller
+```
+
+### Example
+
+> **Caller:** "Is Abe free on Thursday?"
+> **Amber:** "Let me check on that for you..."
+> *(Amber calls ask_openclaw: "Is Abe available Thursday evening?")*
+> *(OpenClaw checks calendar, responds: "Thursday evening is clear.")*
+> **Amber:** "Yes, Thursday evening works! Shall I set something up?"
+
+### Configuration
+
+The bridge connects to your OpenClaw gateway at `OPENCLAW_GATEWAY_URL` (default: `http://127.0.0.1:18789`) using `OPENCLAW_GATEWAY_TOKEN` for auth. It sends questions as chat completions with:
+
+- A system prompt providing call context (who's calling, the objective, recent transcript)
+- The voice agent's question as the user message
+
+Your OpenClaw instance handles the rest — calendar lookups, contact resolution, memory search, or whatever tools you have configured.
+
+### When does Amber use it?
+
+- Caller asks something not in the system prompt (schedule, availability, preferences)
+- Caller requests information about the operator
+- Outbound calls where Amber needs to verify details mid-conversation
+- Any question where the answer requires your personal data/context
+
+### Verbal fillers
+
+To avoid dead air while waiting for OpenClaw to respond, Amber automatically says natural filler phrases like "One moment, let me check on that" before making the tool call. VAD (Voice Activity Detection) is tuned to avoid cutting off the caller during these pauses.
+
+## Webhook architecture
+
+The bridge exposes two webhook endpoints — make sure you point each service to the right one:
+
+| Endpoint | Source | Purpose | Signature verification |
+|----------|--------|---------|----------------------|
+| `/twilio/inbound` | Twilio | Incoming phone calls → generates TwiML to bridge to OpenAI SIP | None (Twilio-facing) |
+| `/twilio/status` | Twilio | Call status callbacks (ringing, answered, completed) | None |
+| `/openai/webhook` | OpenAI Realtime | Incoming SIP call events from OpenAI | ✅ `openai-signature` HMAC-SHA256 |
+| `/call/outbound` | Your app/OpenClaw | Trigger an outbound call | Internal (localhost only) |
+
+**Common setup mistake:** If you point Twilio's voice webhook at `/openai/webhook` instead of `/twilio/inbound`, calls will fail because Twilio doesn't send the `openai-signature` header that endpoint expects.
+
 ## Personalization requirements
 
 Before deploying, users must personalize:
