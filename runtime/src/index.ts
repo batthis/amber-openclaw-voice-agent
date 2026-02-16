@@ -99,6 +99,11 @@ const OPENAI_VOICE = process.env.OPENAI_VOICE ?? 'alloy';
 const OPENCLAW_GATEWAY_URL = process.env.OPENCLAW_GATEWAY_URL ?? 'http://127.0.0.1:18789';
 const OPENCLAW_GATEWAY_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN ?? '';
 
+// Security: Bridge API authentication
+const BRIDGE_API_TOKEN = process.env.BRIDGE_API_TOKEN ?? '';
+// Security: Twilio webhook signature validation (strict mode)
+const TWILIO_WEBHOOK_STRICT = process.env.TWILIO_WEBHOOK_STRICT === 'true';
+
 // Configurable operator/assistant info (sanitized to prevent prompt injection)
 const ASSISTANT_NAME = sanitizeEnvName(process.env.ASSISTANT_NAME ?? 'Amber');
 const OPERATOR_NAME = sanitizeEnvName(process.env.OPERATOR_NAME ?? 'your operator');
@@ -124,6 +129,84 @@ const OUTBOUND_MAP_PATH = (() => {
     return defaultPath;
   }
 })();
+
+// ─── Security Middleware ───
+
+/**
+ * Require bearer token authentication or localhost-only access for sensitive endpoints.
+ * If BRIDGE_API_TOKEN is set, all requests must include `Authorization: Bearer <token>`.
+ * If BRIDGE_API_TOKEN is not set, only allow requests from localhost (127.0.0.1, ::1).
+ */
+function requireAuth(req: Request, res: Response, next: express.NextFunction): void {
+  if (BRIDGE_API_TOKEN) {
+    // Token-based authentication
+    const authHeader = req.headers.authorization;
+    const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+    
+    if (!token || token !== BRIDGE_API_TOKEN) {
+      console.warn('AUTH_FAILED', { path: req.path, ip: req.ip, hasToken: !!token });
+      return res.status(401).json({ error: 'Unauthorized: Invalid or missing bearer token' });
+    }
+    
+    return next();
+  }
+  
+  // Localhost-only mode
+  const ip = req.ip || req.socket.remoteAddress || '';
+  const isLocalhost = ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
+  
+  if (!isLocalhost) {
+    console.warn('AUTH_FAILED_LOCALHOST_ONLY', { path: req.path, ip });
+    return res.status(403).json({ error: 'Forbidden: This endpoint is only accessible from localhost' });
+  }
+  
+  next();
+}
+
+/**
+ * Validate Twilio webhook request signature.
+ * If TWILIO_AUTH_TOKEN is available, verify the X-Twilio-Signature header.
+ * If TWILIO_WEBHOOK_STRICT is true, reject requests with invalid signatures.
+ * Otherwise, log a warning but allow the request (backwards compatibility).
+ */
+function validateTwilioWebhook(req: Request, res: Response, next: express.NextFunction): void {
+  if (!TWILIO_AUTH_TOKEN) {
+    // No auth token configured — skip validation
+    return next();
+  }
+  
+  const signature = req.headers['x-twilio-signature'] as string | undefined;
+  if (!signature) {
+    if (TWILIO_WEBHOOK_STRICT) {
+      console.error('TWILIO_WEBHOOK_VALIDATION_FAILED', { path: req.path, reason: 'missing_signature' });
+      return res.status(401).send('Unauthorized: Missing X-Twilio-Signature header');
+    }
+    console.warn('TWILIO_WEBHOOK_NO_SIGNATURE', { path: req.path });
+    return next();
+  }
+  
+  // Reconstruct the full URL as Twilio sees it
+  const protocol = req.headers['x-forwarded-proto'] || (req.secure ? 'https' : 'http');
+  const host = req.headers['x-forwarded-host'] || req.headers.host || '';
+  const url = `${protocol}://${host}${req.originalUrl}`;
+  
+  const isValid = twilio.validateRequest(
+    TWILIO_AUTH_TOKEN,
+    signature,
+    url,
+    req.body
+  );
+  
+  if (!isValid) {
+    if (TWILIO_WEBHOOK_STRICT) {
+      console.error('TWILIO_WEBHOOK_VALIDATION_FAILED', { path: req.path, url, reason: 'invalid_signature' });
+      return res.status(401).send('Unauthorized: Invalid Twilio signature');
+    }
+    console.warn('TWILIO_WEBHOOK_INVALID_SIGNATURE', { path: req.path, url });
+  }
+  
+  next();
+}
 
 // ─── Phase C2: OpenClaw brain-in-loop tool definitions ───
 const OPENCLAW_TOOLS = [
@@ -218,8 +301,9 @@ app.get('/healthz', (_req, res) => res.status(200).json({ ok: true }));
  * POST /openclaw/ask
  * Test endpoint — manually ask the assistant a question (useful for debugging C2).
  * Body: { question: "...", context?: "...", objective?: "...", callPlan?: {...} }
+ * Security: Requires BRIDGE_API_TOKEN bearer auth or localhost-only access.
  */
-app.post('/openclaw/ask', async (req: Request, res: Response) => {
+app.post('/openclaw/ask', requireAuth, async (req: Request, res: Response) => {
   try {
     const question = String(req.body?.question ?? '').trim();
     if (!question) return res.status(400).json({ error: 'Missing question' });
@@ -239,8 +323,9 @@ app.post('/openclaw/ask', async (req: Request, res: Response) => {
 /**
  * POST /twilio/status
  * Receives Twilio call status callbacks to help debug early hangups / SIP failures.
+ * Security: Optional Twilio webhook signature validation (TWILIO_WEBHOOK_STRICT).
  */
-app.post('/twilio/status', (req: Request, res: Response) => {
+app.post('/twilio/status', validateTwilioWebhook, (req: Request, res: Response) => {
   try {
     const b = req.body as any;
     rememberInboundCallFromTwilioBody(b);
@@ -272,8 +357,9 @@ app.post('/twilio/status', (req: Request, res: Response) => {
 /**
  * POST /twilio/inbound
  * Returns TwiML that bridges inbound PSTN calls (to your Twilio number) to OpenAI Realtime SIP.
+ * Security: Optional Twilio webhook signature validation (TWILIO_WEBHOOK_STRICT).
  */
-app.post('/twilio/inbound', async (req: Request, res: Response) => {
+app.post('/twilio/inbound', validateTwilioWebhook, async (req: Request, res: Response) => {
   try {
     rememberInboundCallFromTwilioBody(req.body as any);
   } catch (e) {
@@ -286,8 +372,9 @@ app.post('/twilio/inbound', async (req: Request, res: Response) => {
  * POST /call/outbound
  * Body: { to: "+1..." } (E.164)
  * Creates a Twilio outbound PSTN call. When the callee answers, Twilio will request TwiML from /twiml/bridge.
+ * Security: Requires BRIDGE_API_TOKEN bearer auth or localhost-only access.
  */
-app.post('/call/outbound', async (req: Request, res: Response) => {
+app.post('/call/outbound', requireAuth, async (req: Request, res: Response) => {
   try {
     const to = String(req.body?.to ?? '').trim();
     if (!isE164(to)) {

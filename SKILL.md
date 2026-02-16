@@ -2,7 +2,7 @@
 name: amber-voice-assistant
 description: "Phone-capable AI voice agent for OpenClaw: production-ready Twilio + OpenAI Realtime SIP bridge (runtime/), built-in call log dashboard (dashboard/), setup guidance, env templates, validation scripts, guardrail patterns, and troubleshooting runbooks."
 homepage: https://github.com/batthis/amber-openclaw-voice-agent
-metadata: {"openclaw":{"emoji":"☎️","requires":{"env":["TWILIO_ACCOUNT_SID","TWILIO_AUTH_TOKEN","TWILIO_CALLER_ID","OPENAI_API_KEY","OPENAI_PROJECT_ID","OPENAI_WEBHOOK_SECRET","PUBLIC_BASE_URL"],"anyBins":["node"]},"primaryEnv":"OPENAI_API_KEY"}}
+metadata: {"openclaw":{"emoji":"☎️","requires":{"env":["TWILIO_ACCOUNT_SID","TWILIO_AUTH_TOKEN","TWILIO_CALLER_ID","OPENAI_API_KEY","OPENAI_PROJECT_ID","OPENAI_WEBHOOK_SECRET","PUBLIC_BASE_URL"],"optionalEnv":["OPENCLAW_GATEWAY_URL","OPENCLAW_GATEWAY_TOKEN","BRIDGE_API_TOKEN","TWILIO_WEBHOOK_STRICT"],"anyBins":["node"]},"primaryEnv":"OPENAI_API_KEY"}}
 ---
 
 # Amber — Phone-Capable Voice Agent
@@ -83,6 +83,44 @@ Your OpenClaw instance handles the rest — calendar lookups, contact resolution
 ### Verbal fillers
 
 To avoid dead air while waiting for OpenClaw to respond, Amber automatically says natural filler phrases like "One moment, let me check on that" before making the tool call. VAD (Voice Activity Detection) is tuned to avoid cutting off the caller during these pauses.
+
+## Runtime environment variables
+
+### Required
+
+| Variable | Description |
+|----------|-------------|
+| `TWILIO_ACCOUNT_SID` | Your Twilio account SID |
+| `TWILIO_AUTH_TOKEN` | Your Twilio auth token (used for API calls and optional webhook validation) |
+| `TWILIO_CALLER_ID` | Your Twilio phone number in E.164 format (e.g., `+14165551234`) |
+| `OPENAI_API_KEY` | Your OpenAI API key |
+| `OPENAI_PROJECT_ID` | Your OpenAI project ID (for Realtime SIP) |
+| `OPENAI_WEBHOOK_SECRET` | Your OpenAI webhook secret (for signature verification) |
+| `PUBLIC_BASE_URL` | The public URL where your bridge is hosted (e.g., `https://your-domain.com`) |
+
+### Optional
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `OPENCLAW_GATEWAY_URL` | `http://127.0.0.1:18789` | URL of your OpenClaw gateway for `ask_openclaw` tool |
+| `OPENCLAW_GATEWAY_TOKEN` | *(empty)* | Bearer token for authenticating to your OpenClaw gateway |
+| `BRIDGE_API_TOKEN` | *(empty)* | If set, require `Authorization: Bearer <token>` for `/call/outbound` and `/openclaw/ask`. If not set, these endpoints are localhost-only. |
+| `TWILIO_WEBHOOK_STRICT` | `false` | If set to `"true"`, reject Twilio webhook requests with invalid signatures. Otherwise, log a warning but process the request (backwards compatible). |
+| `ASSISTANT_NAME` | `Amber` | Name of your voice assistant |
+| `OPERATOR_NAME` | `your operator` | Name of the person the assistant represents |
+| `OPERATOR_PHONE` | *(empty)* | Operator's phone number (used in fallback responses) |
+| `OPERATOR_EMAIL` | *(empty)* | Operator's email (used in fallback responses) |
+| `ORG_NAME` | *(empty)* | Organization name (included in greetings) |
+| `DEFAULT_CALENDAR` | *(empty)* | Default calendar name for bookings (e.g., `Abe`) |
+| `OPENAI_VOICE` | `alloy` | OpenAI TTS voice (`alloy`, `echo`, `fable`, `onyx`, `nova`, `shimmer`) |
+| `GENZ_CALLER_NUMBERS` | *(empty)* | Comma-separated list of E.164 numbers that should get Gen Z-style screening |
+| `OUTBOUND_MAP_PATH` | `<cwd>/data/bridge-outbound-map.json` | Path for storing outbound call metadata |
+| `DASHBOARD_PROCESSOR_PATH` | *(disabled)* | Path to `process_logs.js` — enables auto-refresh after each call |
+
+### Security notes
+
+- **`BRIDGE_API_TOKEN`**: Protects control endpoints (`/call/outbound`, `/openclaw/ask`) from unauthorized access. If not set, these endpoints only accept requests from localhost. **Highly recommended** if your bridge is internet-accessible.
+- **`TWILIO_WEBHOOK_STRICT`**: When enabled, rejects webhook requests with invalid Twilio signatures. Use this if you want strict webhook authentication. Leave disabled (default) for backwards compatibility with existing deployments that may not send valid signatures.
 
 ## Webhook architecture
 
