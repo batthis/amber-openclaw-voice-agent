@@ -156,12 +156,28 @@ function extractPhoneNumbersFromSipHeaders(sipHeaders) {
         const sid = getHeaderValue(sipHeaders, 'X-Twilio-CallSid');
         return sid || null;
     })();
+    // Extract the original PSTN-leg Twilio CallSid from the To header (embedded as x_twilio_callsid param)
+    const pstnCallSid = (() => {
+        const toVal = getHeaderValue(sipHeaders, 'To');
+        if (!toVal) return null;
+        const m = String(toVal).match(/x_twilio_callsid=(CA[a-f0-9]+)/);
+        return m ? m[1] : null;
+    })();
+    // Extract bridgeId from the To header (embedded as x_bridge_id param)
+    const bridgeId = (() => {
+        const toVal = getHeaderValue(sipHeaders, 'To');
+        if (!toVal) return null;
+        const m = String(toVal).match(/x_bridge_id=(b_[a-f0-9_]+)/);
+        return m ? m[1] : null;
+    })();
 
     return {
         from,
         to: to || (toProject ? 'OpenAI Project' : null),
         toProject,
-        twilioCallSid
+        twilioCallSid,
+        pstnCallSid,
+        bridgeId
     };
 }
 
@@ -239,8 +255,17 @@ function resolvePhoneName(number) {
     return KNOWN_NUMBERS[clean] || null;
 }
 
-function generateCallSummary(transcriptText) {
-    // Simple heuristic summary from transcript content
+function generateCallSummary(transcriptText, direction, outboundObjective) {
+    // For outbound calls, use the objective from bridge-outbound-map.json
+    if (direction === 'outbound' && outboundObjective) {
+        return {
+            intent: outboundObjective,
+            outcome: 'Outbound call completed',
+            nextSteps: ''
+        };
+    }
+
+    // For inbound calls, parse the transcript to extract caller's intent
     const cleaned = cleanTranscriptForDisplay(transcriptText);
     if (!cleaned || cleaned.trim().length < 10) {
         return { intent: '', outcome: '', nextSteps: '' };
@@ -249,15 +274,53 @@ function generateCallSummary(transcriptText) {
     const lines = cleaned.split('\n').filter(Boolean);
     const lower = cleaned.toLowerCase();
 
-    // Extract intent from caller's first substantive line
-    let intent = '';
+    // Extract caller's lines (not assistant's) to understand their intent
+    const callerLines = [];
     for (const line of lines) {
         const callerMatch = line.match(/^CALLER:\s*(.+)/i);
         if (callerMatch) {
             const msg = callerMatch[1].trim();
-            if (msg.length > 15) { // skip short greetings
-                intent = msg;
-                break;
+            if (msg.length > 5) { // capture most utterances
+                callerLines.push(msg);
+            }
+        }
+    }
+
+    // Derive intent from caller's actual requests/questions
+    let intent = '';
+    if (callerLines.length > 0) {
+        // Skip common greetings and polite responses to find substantive content
+        const skipPatterns = [
+            /^(hi|hello|hey|good morning|good afternoon|good evening)\b/i,
+            /^(yes|yeah|yep|yup|sure|okay|ok|alright|fine)\b/i,
+            /^(thanks|thank you|no problem|great|perfect|sounds good)\b/i,
+            /^i'?m\s+(doing\s+)?(great|good|fine|well|okay|ok)\b/i,
+            /^how are you/i,
+            /^nice to (meet|hear)/i
+        ];
+        
+        for (const line of callerLines) {
+            // Check if this line should be skipped
+            const shouldSkip = skipPatterns.some(pattern => pattern.test(line));
+            if (shouldSkip) {
+                continue;
+            }
+            // This is likely their actual intent
+            intent = line;
+            break;
+        }
+        
+        // If we only got greetings/responses, look for the longest substantive line
+        if (!intent && callerLines.length > 0) {
+            const substantive = callerLines
+                .filter(line => !skipPatterns.some(pattern => pattern.test(line)))
+                .sort((a, b) => b.length - a.length);
+            
+            if (substantive.length > 0) {
+                intent = substantive[0];
+            } else {
+                // Fallback: use the longest caller line
+                intent = callerLines.sort((a, b) => b.length - a.length)[0];
             }
         }
     }
@@ -345,6 +408,18 @@ async function processLogsWithOptions(options) {
     const logsDir = options.logsDir || DEFAULT_LOGS_DIR;
     const outputDir = options.outputDir || DEFAULT_OUTPUT_DIR;
     const writeSample = options.writeSample !== false;
+
+    // Load bridge outbound call data for resolving outbound call metadata
+    let bridgeOutboundMap = {};
+    try {
+        const bridgeMapPath = path.join(HOME, 'clawd/memory/bridge-outbound-map.json');
+        const bridgeMapData = safeReadJson(bridgeMapPath);
+        if (bridgeMapData && !bridgeMapData.__parse_error && bridgeMapData.calls) {
+            bridgeOutboundMap = bridgeMapData.calls;
+        }
+    } catch (e) {
+        console.warn('Could not load bridge-outbound-map.json:', e);
+    }
 
     try {
         ensureDir(outputDir);
@@ -444,12 +519,38 @@ async function processLogsWithOptions(options) {
                     capturedMessages.push(...deduped);
                 }
 
+                // For outbound calls, try to get the real "to" number from bridge-outbound-map.json
+                // Match using pstnCallSid (original PSTN leg SID embedded in SIP To header)
+                let to = metadata.to;
+                let outboundObjective = null;
+                const matchSid = metadata.pstnCallSid || metadata.twilioCallSid;
+                if (metadata.direction === 'outbound' && matchSid && bridgeOutboundMap[matchSid]) {
+                    const bridgeData = bridgeOutboundMap[matchSid];
+                    if (bridgeData.to) {
+                        to = bridgeData.to;
+                    }
+                    outboundObjective = bridgeData.objective || null;
+                }
+                // Also try matching by bridgeId if pstnCallSid didn't match
+                if (metadata.direction === 'outbound' && !outboundObjective && metadata.bridgeId) {
+                    for (const [sid, data] of Object.entries(bridgeOutboundMap)) {
+                        if (data.bridgeId === metadata.bridgeId) {
+                            if (data.to) to = data.to;
+                            outboundObjective = data.objective || null;
+                            break;
+                        }
+                    }
+                }
+                // Fallback if we still don't have a "to" value
+                if (!to) {
+                    to = metadata.direction === 'outbound' ? null : 'OpenAI Project';
+                }
+
                 const from = metadata.from || (metadata.direction === 'outbound' ? TWILIO_NUMBER : null);
-                const to = metadata.to || (metadata.direction === 'outbound' ? null : 'OpenAI Project');
                 const fromName = (from === TWILIO_NUMBER) ? ASSISTANT_NAME : resolvePhoneName(from);
                 const toName = (to === TWILIO_NUMBER) ? ASSISTANT_NAME : resolvePhoneName(to);
 
-                const callSummary = generateCallSummary(transcriptText);
+                const callSummary = generateCallSummary(transcriptText, metadata.direction, outboundObjective);
                 
                 const call = {
                     id: callId,
