@@ -522,9 +522,9 @@ const callAccept = {
             tool_choice: 'auto',
             turn_detection: {
               type: 'server_vad',
-              threshold: 0.7,
-              prefix_padding_ms: 500,
-              silence_duration_ms: 700,
+              threshold: 0.85,
+              prefix_padding_ms: 600,
+              silence_duration_ms: 900,
             },
           },
         };
@@ -649,16 +649,16 @@ const callAccept = {
 
         if (fnName === 'ask_openclaw') {
           // Inject verbal filler BEFORE processing so the caller isn't waiting in silence.
-          // We send a response.create with a brief "checking" message. The Realtime API
-          // will generate this speech while we async-process the function call.
+          // Pick a witty, context-aware filler based on what's being looked up.
+          const fillerInstruction = getWittyFiller(fnArgs);
           const fillerMsg = {
             type: 'response.create',
             response: {
-              instructions: 'Say briefly and naturally: "One moment, let me check on that for you."',
+              instructions: fillerInstruction,
             },
           };
           ws.send(JSON.stringify(fillerMsg));
-          writeJsonl({ type: 'c2.filler_sent', call_id: callId, received_at: new Date().toISOString() });
+          writeJsonl({ type: 'c2.filler_sent', call_id: callId, received_at: new Date().toISOString(), filler: fillerInstruction });
 
           handleAskOpenClaw(ws, callId, itemId, fnCallId, fnArgs, outboundObjective, outboundCallPlan, transcriptStream, writeJsonl);
         } else {
@@ -689,6 +689,20 @@ const callAccept = {
       });
       await Promise.all([endStream(jsonlStream), endStream(transcriptStream)]);
       await finalizeSummaryFromTranscript(callId);
+
+      // Auto-refresh call log dashboard after every call (if dashboard processor exists)
+      try {
+        const { execFile } = await import('child_process');
+        const dashboardProcessor = path.resolve(process.env.HOME || '.', 'clawd/canvas/call-log/process_logs.js');
+        if (fs.existsSync(dashboardProcessor)) {
+          execFile('node', [dashboardProcessor], { env: { ...process.env, TWILIO_CALLER_ID: process.env.TWILIO_CALLER_ID || '' } }, (err) => {
+            if (err) console.error('Dashboard auto-refresh failed:', err.message);
+            else console.log('Dashboard auto-refreshed after call', callId);
+          });
+        }
+      } catch (dashErr: any) {
+        console.error('Dashboard auto-refresh error:', dashErr.message);
+      }
     });
 
     // Always ack the webhook quickly.
@@ -880,6 +894,64 @@ function buildOutboundGreeting(args: { objective: string }): string {
   // Generic scripted outbound greeting
   const orgPart = ORG_NAME ? ` from ${ORG_NAME}` : '';
   return `Hi! This is ${ASSISTANT_NAME}${orgPart}. How are you doing today?`;
+}
+
+/**
+ * Generate a witty, context-aware verbal filler while waiting for ask_openclaw responses.
+ * Makes the assistant sound more human by commenting on what she's doing in the background.
+ */
+function getWittyFiller(fnArgs: string): string {
+  let question = '';
+  try {
+    const parsed = JSON.parse(fnArgs);
+    question = (parsed.question || '').toLowerCase();
+  } catch { }
+
+  // Calendar / scheduling related
+  if (question.match(/calendar|schedule|available|availability|free|busy|book|appointment|meeting|thursday|monday|tuesday|wednesday|friday/)) {
+    const calendarFillers = [
+      "Say briefly and naturally something witty about checking the calendar — like you're wrestling with scheduling or making a light joke about how calendars are the bane of modern existence, then say you're looking it up now.",
+      "Say briefly: mention you're diving into the calendar, and add a quick witty remark about how you wish scheduling was as easy as ordering coffee. Keep it light and natural.",
+      "Say briefly and naturally: make a playful comment about calendars being like puzzles, then mention you're checking availability right now.",
+      "Say briefly: quip about how if time travel existed you wouldn't need to check calendars, but for now let me take a look.",
+    ];
+    return calendarFillers[Math.floor(Math.random() * calendarFillers.length)];
+  }
+
+  // Contact / people lookup
+  if (question.match(/contact|phone|number|email|who is|reach|call/)) {
+    const contactFillers = [
+      "Say briefly and naturally: make a light joke about flipping through the Rolodex — do people even know what those are anymore? — then say you're looking that up.",
+      "Say briefly: mention you're digging through the contacts and add a quick quip about being a professional name-rememberer.",
+    ];
+    return contactFillers[Math.floor(Math.random() * contactFillers.length)];
+  }
+
+  // Weather
+  if (question.match(/weather|rain|snow|temperature|cold|hot|forecast/)) {
+    const weatherFillers = [
+      "Say briefly and naturally: joke that you're consulting the clouds — or at least the next best thing — and you'll have the answer in a sec.",
+    ];
+    return weatherFillers[Math.floor(Math.random() * weatherFillers.length)];
+  }
+
+  // Creating / booking / adding events
+  if (question.match(/create|add|set up|book|reserve|make a/)) {
+    const createFillers = [
+      "Say briefly and naturally: mention you're getting that set up, and add a quick quip about being on it faster than you can say 'done'.",
+      "Say briefly: say you're working on that right now, with a light remark about your love for being organized.",
+    ];
+    return createFillers[Math.floor(Math.random() * createFillers.length)];
+  }
+
+  // Generic fallback — still witty
+  const genericFillers = [
+    "Say briefly and naturally: mention you're looking into it, and add a short witty remark — maybe about how being an AI assistant means you never get a coffee break. Keep it light.",
+    "Say briefly: say you're checking on that, with a playful comment about putting your digital brain to work.",
+    "Say briefly and naturally: mention you're on it, and make a quick lighthearted quip about multitasking.",
+    "Say briefly: tell them you're pulling that up now, and add a fun one-liner about how you love a good question.",
+  ];
+  return genericFillers[Math.floor(Math.random() * genericFillers.length)];
 }
 
 function buildSilenceFollowup(args: { mode: 'inbound' | 'outbound' }): string {
