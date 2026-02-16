@@ -193,6 +193,8 @@ The built-in dashboard provides a real-time web UI for browsing your call histor
 | `CONTACTS_FILE` | `./contacts.json` | Optional phone→name mapping file |
 | `LOGS_DIR` | `../runtime/logs` | Directory containing call log files |
 | `OUTPUT_DIR` | `./data` | Where processed JSON is written |
+| `BRIDGE_OUTBOUND_MAP` | `<LOGS_DIR>/bridge-outbound-map.json` | Path to bridge outbound map (resolves To numbers & objectives) |
+| `DASHBOARD_PROCESSOR_PATH` | *(disabled)* | Path to `process_logs.js` — enables auto-refresh after each call |
 
 See `dashboard/README.md` for full documentation.
 

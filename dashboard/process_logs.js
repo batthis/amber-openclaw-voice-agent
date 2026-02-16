@@ -412,7 +412,9 @@ async function processLogsWithOptions(options) {
     // Load bridge outbound call data for resolving outbound call metadata
     let bridgeOutboundMap = {};
     try {
-        const bridgeMapPath = path.join(HOME, 'clawd/memory/bridge-outbound-map.json');
+        // Load outbound call map for resolving "to" numbers and objectives.
+        // Set BRIDGE_OUTBOUND_MAP env var to the path, or defaults to ../runtime/logs/bridge-outbound-map.json
+        const bridgeMapPath = process.env.BRIDGE_OUTBOUND_MAP || path.join(logsDir, 'bridge-outbound-map.json');
         const bridgeMapData = safeReadJson(bridgeMapPath);
         if (bridgeMapData && !bridgeMapData.__parse_error && bridgeMapData.calls) {
             bridgeOutboundMap = bridgeMapData.calls;
