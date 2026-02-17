@@ -246,7 +246,12 @@ function requireAuth(req: Request, res: Response, next: express.NextFunction): v
  */
 function validateProviderWebhook(req: Request, res: Response, next: express.NextFunction): void {
   if (!VOICE_WEBHOOK_SECRET) {
-    // No secret configured — skip validation (allows local dev without credentials)
+    // No secret configured — skip validation (allows local dev without credentials).
+    // WARNING: In production, set VOICE_WEBHOOK_SECRET (or TWILIO_AUTH_TOKEN for Twilio)
+    // to prevent spoofed webhook requests.
+    if (process.env.NODE_ENV !== 'test') {
+      console.warn('[AMBER] ⚠️  VOICE_WEBHOOK_SECRET is not set — webhook signature validation is DISABLED. Set VOICE_WEBHOOK_SECRET in production to prevent spoofed requests.');
+    }
     return next();
   }
 

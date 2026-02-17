@@ -2,7 +2,7 @@
 name: amber-voice-assistant
 description: "Phone-capable AI voice agent for OpenClaw: production-ready voice bridge (Twilio by default, provider-swappable) + OpenAI Realtime SIP, built-in call log dashboard (dashboard/), setup guidance, env templates, validation scripts, guardrail patterns, and troubleshooting runbooks."
 homepage: https://github.com/batthis/amber-openclaw-voice-agent
-metadata: {"openclaw":{"emoji":"☎️","requires":{"env":["TWILIO_ACCOUNT_SID","TWILIO_AUTH_TOKEN","TWILIO_CALLER_ID","OPENAI_API_KEY","OPENAI_PROJECT_ID","OPENAI_WEBHOOK_SECRET","PUBLIC_BASE_URL"],"optionalEnv":["OPENCLAW_GATEWAY_URL","OPENCLAW_GATEWAY_TOKEN","BRIDGE_API_TOKEN","TWILIO_WEBHOOK_STRICT","VOICE_PROVIDER"],"anyBins":["node","ical-query"]},"primaryEnv":"OPENAI_API_KEY"}}
+metadata: {"openclaw":{"emoji":"☎️","requires":{"env":["TWILIO_ACCOUNT_SID","TWILIO_AUTH_TOKEN","TWILIO_CALLER_ID","OPENAI_API_KEY","OPENAI_PROJECT_ID","OPENAI_WEBHOOK_SECRET","PUBLIC_BASE_URL"],"optionalEnv":["OPENCLAW_GATEWAY_URL","OPENCLAW_GATEWAY_TOKEN","BRIDGE_API_TOKEN","TWILIO_WEBHOOK_STRICT","VOICE_PROVIDER","VOICE_WEBHOOK_SECRET"],"anyBins":["node","ical-query"]},"primaryEnv":"OPENAI_API_KEY"}}
 ---
 
 # Amber — Phone-Capable Voice Agent
@@ -106,6 +106,7 @@ To avoid dead air while waiting for OpenClaw to respond, Amber automatically say
 | `OPENCLAW_GATEWAY_TOKEN` | *(empty)* | Bearer token for authenticating to your OpenClaw gateway |
 | `BRIDGE_API_TOKEN` | *(empty)* | If set, require `Authorization: Bearer <token>` for `/call/outbound` and `/openclaw/ask`. If not set, these endpoints are localhost-only. |
 | `VOICE_PROVIDER` | `twilio` | Telephony provider. Currently supported: `twilio` (production-ready), `telnyx` (stub — not yet implemented). Swap providers with zero code changes. |
+| `VOICE_WEBHOOK_SECRET` | *(falls back to `TWILIO_AUTH_TOKEN`)* | Webhook validation secret for non-Twilio providers. **Required in production when `VOICE_PROVIDER` is not `twilio`.** If unset, webhook signature validation is skipped and the bridge will accept spoofed requests. A startup warning is logged when this is missing. |
 | `TWILIO_WEBHOOK_STRICT` | `false` | If set to `"true"`, reject Twilio webhook requests with invalid signatures. Otherwise, log a warning but process the request (backwards compatible). |
 | `ASSISTANT_NAME` | `Amber` | Name of your voice assistant |
 | `OPERATOR_NAME` | `your operator` | Name of the person the assistant represents |
@@ -122,6 +123,18 @@ To avoid dead air while waiting for OpenClaw to respond, Amber automatically say
 - **`BRIDGE_API_TOKEN`**: Protects control endpoints (`/call/outbound`, `/openclaw/ask`) from unauthorized access. If not set, these endpoints only accept requests from localhost. **Highly recommended** if your bridge is internet-accessible.
 - **`VOICE_PROVIDER`**: Selects the telephony carrier adapter. Amber uses a provider adapter pattern — the carrier layer (phone numbers, PSTN routing) is decoupled from the AI pipeline. Set to `twilio` (default) for production use. Setting `telnyx` will throw `not implemented` errors until the Telnyx adapter is filled in (`runtime/src/providers/telnyx.ts`). Future providers can be added without touching any core logic.
 - **`TWILIO_WEBHOOK_STRICT`**: When enabled, rejects webhook requests with invalid Twilio signatures. Use this if you want strict webhook authentication. Leave disabled (default) for backwards compatibility with existing deployments that may not send valid signatures.
+
+## ⚠️ Production security checklist
+
+Before exposing Amber to the public internet, verify all of the following:
+
+| # | Check | Risk if skipped |
+|---|-------|-----------------|
+| 1 | **Set `BRIDGE_API_TOKEN`** | `/call/outbound` and `/openclaw/ask` default to localhost-only. If your bridge is internet-accessible without a token, anyone can trigger outbound calls or query your OpenClaw instance. |
+| 2 | **Set `VOICE_WEBHOOK_SECRET`** (or ensure `TWILIO_AUTH_TOKEN` is set) | If unset, webhook signature validation is **silently skipped**. Spoofed requests from any source will be accepted and processed as real calls. A startup warning is logged but the bridge will still run. |
+| 3 | **Set `TWILIO_WEBHOOK_STRICT=true`** | Without this, requests with invalid Twilio signatures are logged but still processed. Enable for strict production enforcement. |
+| 4 | **Secure the dashboard** | `dashboard/` exposes call transcripts and caller metadata. Serve it behind authentication or restrict to localhost only. |
+| 5 | **Do not commit `dashboard/data/`** | Runtime call logs contain caller names and phone numbers. These are excluded from git and the published skill package by design — keep them that way. |
 
 ## External dependencies
 
