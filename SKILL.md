@@ -2,7 +2,7 @@
 name: amber-voice-assistant
 description: "Phone-capable AI voice agent for OpenClaw: production-ready voice bridge (Twilio by default, provider-swappable) + OpenAI Realtime SIP, built-in call log dashboard (dashboard/), setup guidance, env templates, validation scripts, guardrail patterns, and troubleshooting runbooks."
 homepage: https://github.com/batthis/amber-openclaw-voice-agent
-metadata: {"openclaw":{"emoji":"☎️","requires":{"env":["TWILIO_ACCOUNT_SID","TWILIO_AUTH_TOKEN","TWILIO_CALLER_ID","OPENAI_API_KEY","OPENAI_PROJECT_ID","OPENAI_WEBHOOK_SECRET","PUBLIC_BASE_URL"],"optionalEnv":["OPENCLAW_GATEWAY_URL","OPENCLAW_GATEWAY_TOKEN","BRIDGE_API_TOKEN","TWILIO_WEBHOOK_STRICT","VOICE_PROVIDER"],"anyBins":["node"]},"primaryEnv":"OPENAI_API_KEY"}}
+metadata: {"openclaw":{"emoji":"☎️","requires":{"env":["TWILIO_ACCOUNT_SID","TWILIO_AUTH_TOKEN","TWILIO_CALLER_ID","OPENAI_API_KEY","OPENAI_PROJECT_ID","OPENAI_WEBHOOK_SECRET","PUBLIC_BASE_URL"],"optionalEnv":["OPENCLAW_GATEWAY_URL","OPENCLAW_GATEWAY_TOKEN","BRIDGE_API_TOKEN","TWILIO_WEBHOOK_STRICT","VOICE_PROVIDER"],"anyBins":["node","ical-query"]},"primaryEnv":"OPENAI_API_KEY"}}
 ---
 
 # Amber — Phone-Capable Voice Agent
@@ -122,6 +122,31 @@ To avoid dead air while waiting for OpenClaw to respond, Amber automatically say
 - **`BRIDGE_API_TOKEN`**: Protects control endpoints (`/call/outbound`, `/openclaw/ask`) from unauthorized access. If not set, these endpoints only accept requests from localhost. **Highly recommended** if your bridge is internet-accessible.
 - **`VOICE_PROVIDER`**: Selects the telephony carrier adapter. Amber uses a provider adapter pattern — the carrier layer (phone numbers, PSTN routing) is decoupled from the AI pipeline. Set to `twilio` (default) for production use. Setting `telnyx` will throw `not implemented` errors until the Telnyx adapter is filled in (`runtime/src/providers/telnyx.ts`). Future providers can be added without touching any core logic.
 - **`TWILIO_WEBHOOK_STRICT`**: When enabled, rejects webhook requests with invalid Twilio signatures. Use this if you want strict webhook authentication. Leave disabled (default) for backwards compatibility with existing deployments that may not send valid signatures.
+
+## External dependencies
+
+### `ical-query` (optional)
+`ical-query` is a macOS Swift CLI that reads Apple Calendar via EventKit — it is **not** a third-party package. It is referenced in `AGENT.md` for live calendar availability checks during call handling. It is only needed if you want Amber to check your local Apple Calendar mid-call.
+
+- **Source:** Companion tool shipped with OpenClaw (`/usr/local/bin/ical-query`) — installed automatically by OpenClaw on macOS.
+- **Not required:** If `ical-query` is absent, Amber will still function normally; calendar-check instructions in `AGENT.md` will not execute.
+- **Platform:** macOS only (EventKit). Not available on Linux/Windows; omit those AGENT.md instructions if deploying on non-Apple hosts.
+
+### `SUMMARY_JSON` structured output
+`AGENT.md` instructs Amber to emit a silent `SUMMARY_JSON` token as the **final line** of a call session when a message is taken. This is **not** an exfiltration mechanism — it is consumed exclusively by OpenClaw's own SIP webhook handler (`/openai/webhook`) to extract caller name, callback number, and message for storage in the local call log and optional OpenClaw notification.
+
+- **Who reads it:** The `runtime/src/index.ts` webhook handler — running on your own host.
+- **Where it goes:** Written to `runtime/data/` (local disk only) and optionally forwarded to your OpenClaw gateway via `ask_openclaw` (your own instance, configured by you).
+- **Never transmitted externally:** No third-party service receives this output. The bridge has no analytics, telemetry, or external data forwarding.
+- **Scope is caller-provided data only:** name, callback number, and message — no system data, credentials, or environment variables.
+
+## Call log data and privacy
+
+The call log dashboard (`dashboard/`) stores transcripts and caller metadata in `dashboard/data/`. This directory is **excluded from the published skill package and git history** — it contains runtime-generated data local to your deployment.
+
+- `dashboard/data/calls.json` and `dashboard/data/calls.js` are written at runtime and listed in `.gitignore`.
+- The published skill includes only `dashboard/data/sample.*` files (anonymized, non-real data) for UI development/demo purposes.
+- **Recommendation:** If your bridge is internet-accessible, set `BRIDGE_API_TOKEN` and serve the dashboard behind authentication or localhost-only.
 
 ## Webhook architecture
 

@@ -8,3 +8,11 @@ runtime/logs/
 runtime/package-lock.json
 *.log
 .DS_Store
+
+# Dashboard runtime data (call logs, transcripts — PII, never commit or publish)
+dashboard/data/calls.json
+dashboard/data/calls.js
+dashboard/data/meta.json
+dashboard/data/meta.js
+# Sample files (anonymized demo data) are intentionally kept
+# dashboard/data/sample.* — DO NOT exclude
