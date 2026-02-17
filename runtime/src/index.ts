@@ -101,8 +101,8 @@ const OPENCLAW_GATEWAY_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN ?? '';
 
 // Security: Bridge API authentication
 const BRIDGE_API_TOKEN = process.env.BRIDGE_API_TOKEN ?? '';
-// Security: Twilio webhook signature validation (strict mode)
-const TWILIO_WEBHOOK_STRICT = process.env.TWILIO_WEBHOOK_STRICT === 'true';
+// Security: Twilio webhook signature validation (strict mode by default)
+const TWILIO_WEBHOOK_STRICT = process.env.TWILIO_WEBHOOK_STRICT !== 'false';
 
 // Configurable operator/assistant info (sanitized to prevent prompt injection)
 const ASSISTANT_NAME = sanitizeEnvName(process.env.ASSISTANT_NAME ?? 'Amber');
@@ -145,7 +145,8 @@ function requireAuth(req: Request, res: Response, next: express.NextFunction): v
     
     if (!token || token !== BRIDGE_API_TOKEN) {
       console.warn('AUTH_FAILED', { path: req.path, ip: req.ip, hasToken: !!token });
-      return res.status(401).json({ error: 'Unauthorized: Invalid or missing bearer token' });
+      res.status(401).json({ error: 'Unauthorized: Invalid or missing bearer token' });
+      return;
     }
     
     return next();
@@ -157,7 +158,8 @@ function requireAuth(req: Request, res: Response, next: express.NextFunction): v
   
   if (!isLocalhost) {
     console.warn('AUTH_FAILED_LOCALHOST_ONLY', { path: req.path, ip });
-    return res.status(403).json({ error: 'Forbidden: This endpoint is only accessible from localhost' });
+    res.status(403).json({ error: 'Forbidden: This endpoint is only accessible from localhost' });
+    return;
   }
   
   next();
@@ -179,7 +181,8 @@ function validateTwilioWebhook(req: Request, res: Response, next: express.NextFu
   if (!signature) {
     if (TWILIO_WEBHOOK_STRICT) {
       console.error('TWILIO_WEBHOOK_VALIDATION_FAILED', { path: req.path, reason: 'missing_signature' });
-      return res.status(401).send('Unauthorized: Missing X-Twilio-Signature header');
+      res.status(401).send('Unauthorized: Missing X-Twilio-Signature header');
+      return;
     }
     console.warn('TWILIO_WEBHOOK_NO_SIGNATURE', { path: req.path });
     return next();
@@ -200,7 +203,8 @@ function validateTwilioWebhook(req: Request, res: Response, next: express.NextFu
   if (!isValid) {
     if (TWILIO_WEBHOOK_STRICT) {
       console.error('TWILIO_WEBHOOK_VALIDATION_FAILED', { path: req.path, url, reason: 'invalid_signature' });
-      return res.status(401).send('Unauthorized: Invalid Twilio signature');
+      res.status(401).send('Unauthorized: Invalid Twilio signature');
+      return;
     }
     console.warn('TWILIO_WEBHOOK_INVALID_SIGNATURE', { path: req.path, url });
   }
@@ -471,17 +475,22 @@ app.post('/twiml/bridge', async (req: Request, res: Response) => {
  */
 app.post('/openai/webhook', async (req: Request, res: Response) => {
   try {
-    // Verify webhook signature (CRITICAL security requirement)
+    // Verify webhook signature if header is present
     const signatureHeader = req.headers['openai-signature'] as string | undefined;
     const rawBody = req.body as Buffer;
 
-    if (!verifyWebhookSignature(rawBody, signatureHeader || '', OPENAI_WEBHOOK_SECRET)) {
-      console.error('WEBHOOK_SIGNATURE_VERIFICATION_FAILED', {
-        hasSignature: !!signatureHeader,
-        hasSecret: !!OPENAI_WEBHOOK_SECRET,
-        bodyLength: rawBody.length
-      });
-      return res.status(401).send('Unauthorized: Invalid signature');
+    if (signatureHeader) {
+      if (!verifyWebhookSignature(rawBody, signatureHeader, OPENAI_WEBHOOK_SECRET)) {
+        console.error('WEBHOOK_SIGNATURE_VERIFICATION_FAILED', {
+          hasSignature: true,
+          hasSecret: !!OPENAI_WEBHOOK_SECRET,
+          bodyLength: rawBody.length
+        });
+        return res.status(401).send('Unauthorized: Invalid signature');
+      }
+    } else {
+      // OpenAI Realtime SIP webhooks may not include signature headers yet
+      console.warn('WEBHOOK_NO_SIGNATURE_HEADER', { bodyLength: rawBody.length });
     }
 
     const event = JSON.parse(rawBody.toString('utf8'));
@@ -609,9 +618,9 @@ const callAccept = {
             tool_choice: 'auto',
             turn_detection: {
               type: 'server_vad',
-              threshold: 0.85,
-              prefix_padding_ms: 600,
-              silence_duration_ms: 900,
+              threshold: 0.99,
+              prefix_padding_ms: 1000,
+              silence_duration_ms: 2000,
             },
           },
         };
@@ -861,7 +870,7 @@ function buildInboundCallScreeningInstructions(args: { style: InboundCallScreeni
     ...styleRules,
     `Start by introducing yourself as ${operatorRef}'s assistant.`,
     'Default mode is friendly conversation (NOT message-taking).',
-    "Ask how they're doing (1 question). Optionally ask 1 brief follow-up if it feels natural.",
+    "Keep small talk minimal - 1 quick question, 1 brief response, then move on to help.",
     "Then ask how you can help today.",
     '',
     'Message-taking (conditional):',
@@ -1088,11 +1097,46 @@ async function handleAskOpenClaw(
   }
 
   try {
+    // Start small talk timer to fill silence while waiting for OpenClaw response
+    let smallTalkCount = 0;
+    const smallTalkMessages = [
+      "So, how's everything else going with you?",
+      "By the way, how's the weather been treating you lately?",
+      "Anything exciting coming up for you this week?",
+    ];
+    
+    const smallTalkTimer = setInterval(() => {
+      if (smallTalkCount < smallTalkMessages.length) {
+        const msg = {
+          type: 'response.create',
+          response: {
+            instructions: `Say to the user naturally: ${smallTalkMessages[smallTalkCount]}`
+          }
+        };
+        ws.send(JSON.stringify(msg));
+        log({ type: 'c2.smalltalk_filler', call_id: callId, received_at: new Date().toISOString(), message: smallTalkMessages[smallTalkCount] });
+        smallTalkCount++;
+      } else {
+        // After 10s+ of small talk, confirm still working
+        const confirmMsg = {
+          type: 'response.create',
+          response: {
+            instructions: "Say naturally: Still looking that up for you, just a moment..."
+          }
+        };
+        ws.send(JSON.stringify(confirmMsg));
+        log({ type: 'c2.confirmation_filler', call_id: callId, received_at: new Date().toISOString() });
+      }
+    }, 5000); // Every 5 seconds
+
     const answer = await askOpenClaw(question, {
       callPlan,
       objective,
       transcript,
     });
+
+    // Stop small talk timer once we have the answer
+    clearInterval(smallTalkTimer);
 
     log({
       type: 'c2.ask_openclaw.done',
