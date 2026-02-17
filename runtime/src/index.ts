@@ -1109,28 +1109,21 @@ async function handleAskOpenClaw(
   }
 
   try {
-    // Start small talk timer to fill silence while waiting for OpenClaw response
-    // Continue the natural conversation thread instead of just saying "still checking"
-    let smallTalkCount = 0;
-    const smallTalkMessages = [
-      "By the way, did you end up doing anything fun this weekend?",
-      "How's the rest of your week looking?",
-      "Anything exciting coming up?",
-    ];
-    
-    const smallTalkTimer = setInterval(() => {
-      const msg = {
-        type: 'response.create',
-        response: {
-          instructions: smallTalkCount < smallTalkMessages.length
-            ? `Continue the conversation naturally: ${smallTalkMessages[smallTalkCount]}`
-            : "Continue engaging small talk while still working on the request in the background."
-        }
-      };
-      ws.send(JSON.stringify(msg));
-      log({ type: 'c2.smalltalk_filler', call_id: callId, received_at: new Date().toISOString(), count: smallTalkCount });
-      smallTalkCount++;
-    }, 5000); // Every 5 seconds
+    // Send ONE follow-up if the request takes >10 seconds, that's it
+    let followupSent = false;
+    const smallTalkTimer = setTimeout(() => {
+      if (!followupSent) {
+        followupSent = true;
+        const msg = {
+          type: 'response.create',
+          response: {
+            instructions: "Say naturally: Just pulling that up for you — how's everything else going?"
+          }
+        };
+        ws.send(JSON.stringify(msg));
+        log({ type: 'c2.smalltalk_followup', call_id: callId, received_at: new Date().toISOString() });
+      }
+    }, 10000); // After 10 seconds
 
     const answer = await askOpenClaw(question, {
       callPlan,
@@ -1139,7 +1132,7 @@ async function handleAskOpenClaw(
     });
 
     // Stop small talk timer once we have the answer
-    clearInterval(smallTalkTimer);
+    clearTimeout(smallTalkTimer);
 
     log({
       type: 'c2.ask_openclaw.done',
