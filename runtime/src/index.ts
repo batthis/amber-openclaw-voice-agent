@@ -7,7 +7,8 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import OpenAI from 'openai';
 import WebSocket from 'ws';
-import twilio from 'twilio';
+import { createProvider } from './providers/index.js';
+import type { IVoiceProvider } from './providers/index.js';
 
 // ─── Security Helpers ───
 
@@ -86,9 +87,25 @@ function sanitizePromptInput(text: string, maxLen = 500): string {
 const PORT = Number(process.env.PORT ?? 8000);
 const PUBLIC_BASE_URL = mustGetEnv('PUBLIC_BASE_URL');
 
-const TWILIO_ACCOUNT_SID = mustGetEnv('TWILIO_ACCOUNT_SID');
-const TWILIO_AUTH_TOKEN = mustGetEnv('TWILIO_AUTH_TOKEN');
-const TWILIO_CALLER_ID = mustGetEnv('TWILIO_CALLER_ID');
+// ─── Provider selection ───
+// Set VOICE_PROVIDER in .env to switch telephony providers.
+// Defaults to 'twilio' — no change needed for existing deployments.
+// Currently supported: 'twilio' (default, production-ready), 'telnyx' (stub).
+const VOICE_PROVIDER = process.env.VOICE_PROVIDER ?? 'twilio';
+
+// Twilio credentials — required when VOICE_PROVIDER=twilio (the default).
+// Lazily validated: mustGetEnv only throws if we're actually using Twilio.
+const TWILIO_ACCOUNT_SID = VOICE_PROVIDER === 'twilio' ? mustGetEnv('TWILIO_ACCOUNT_SID') : (process.env.TWILIO_ACCOUNT_SID ?? '');
+const TWILIO_AUTH_TOKEN = VOICE_PROVIDER === 'twilio' ? mustGetEnv('TWILIO_AUTH_TOKEN') : (process.env.TWILIO_AUTH_TOKEN ?? '');
+const TWILIO_CALLER_ID = VOICE_PROVIDER === 'twilio' ? mustGetEnv('TWILIO_CALLER_ID') : (process.env.TWILIO_CALLER_ID ?? '');
+
+// Caller ID used for outbound calls. Defaults to TWILIO_CALLER_ID for backward
+// compatibility; override with VOICE_CALLER_ID when using a non-Twilio provider.
+const VOICE_CALLER_ID = process.env.VOICE_CALLER_ID ?? TWILIO_CALLER_ID;
+
+// Webhook validation secret. Defaults to TWILIO_AUTH_TOKEN for backward
+// compatibility; set VOICE_WEBHOOK_SECRET when using a non-Twilio provider.
+const VOICE_WEBHOOK_SECRET = process.env.VOICE_WEBHOOK_SECRET ?? TWILIO_AUTH_TOKEN;
 
 const OPENAI_API_KEY = mustGetEnv('OPENAI_API_KEY');
 const OPENAI_PROJECT_ID = mustGetEnv('OPENAI_PROJECT_ID');
@@ -218,49 +235,59 @@ function requireAuth(req: Request, res: Response, next: express.NextFunction): v
 }
 
 /**
- * Validate Twilio webhook request signature.
- * If TWILIO_AUTH_TOKEN is available, verify the X-Twilio-Signature header.
- * If TWILIO_WEBHOOK_STRICT is true, reject requests with invalid signatures.
- * Otherwise, log a warning but allow the request (backwards compatibility).
+ * Validate inbound provider webhook request signatures.
+ *
+ * Provider-agnostic: uses `voiceProvider.webhookSignatureHeader` to find the
+ * signature and `voiceProvider.validateRequest` to verify it.
+ *
+ * If VOICE_WEBHOOK_SECRET (or TWILIO_AUTH_TOKEN for backward compat) is set,
+ * the signature is verified. When TWILIO_WEBHOOK_STRICT=false, invalid
+ * signatures are logged as warnings rather than rejected (dev convenience).
  */
-function validateTwilioWebhook(req: Request, res: Response, next: express.NextFunction): void {
-  if (!TWILIO_AUTH_TOKEN) {
-    // No auth token configured — skip validation
+function validateProviderWebhook(req: Request, res: Response, next: express.NextFunction): void {
+  if (!VOICE_WEBHOOK_SECRET) {
+    // No secret configured — skip validation (allows local dev without credentials)
     return next();
   }
-  
-  const signature = req.headers['x-twilio-signature'] as string | undefined;
+
+  const signatureHeader = voiceProvider.webhookSignatureHeader;
+  const signature = req.headers[signatureHeader] as string | undefined;
+
   if (!signature) {
     if (TWILIO_WEBHOOK_STRICT) {
-      console.error('TWILIO_WEBHOOK_VALIDATION_FAILED', { path: req.path, reason: 'missing_signature' });
-      res.status(401).send('Unauthorized: Missing X-Twilio-Signature header');
+      console.error('PROVIDER_WEBHOOK_VALIDATION_FAILED', {
+        path: req.path,
+        provider: VOICE_PROVIDER,
+        reason: `missing_${signatureHeader}_header`,
+      });
+      res.status(401).send(`Unauthorized: Missing ${signatureHeader} header`);
       return;
     }
-    console.warn('TWILIO_WEBHOOK_NO_SIGNATURE', { path: req.path });
+    console.warn('PROVIDER_WEBHOOK_NO_SIGNATURE', { path: req.path, provider: VOICE_PROVIDER });
     return next();
   }
-  
-  // Reconstruct the full URL as Twilio sees it
+
+  // Reconstruct the full URL as the provider sees it (respects reverse-proxy headers)
   const protocol = req.headers['x-forwarded-proto'] || (req.secure ? 'https' : 'http');
   const host = req.headers['x-forwarded-host'] || req.headers.host || '';
   const url = `${protocol}://${host}${req.originalUrl}`;
-  
-  const isValid = twilio.validateRequest(
-    TWILIO_AUTH_TOKEN,
-    signature,
-    url,
-    req.body
-  );
-  
+
+  const isValid = voiceProvider.validateRequest(VOICE_WEBHOOK_SECRET, signature, url, req.body);
+
   if (!isValid) {
     if (TWILIO_WEBHOOK_STRICT) {
-      console.error('TWILIO_WEBHOOK_VALIDATION_FAILED', { path: req.path, url, reason: 'invalid_signature' });
-      res.status(401).send('Unauthorized: Invalid Twilio signature');
+      console.error('PROVIDER_WEBHOOK_VALIDATION_FAILED', {
+        path: req.path,
+        provider: VOICE_PROVIDER,
+        url,
+        reason: 'invalid_signature',
+      });
+      res.status(401).send('Unauthorized: Invalid provider webhook signature');
       return;
     }
-    console.warn('TWILIO_WEBHOOK_INVALID_SIGNATURE', { path: req.path, url });
+    console.warn('PROVIDER_WEBHOOK_INVALID_SIGNATURE', { path: req.path, provider: VOICE_PROVIDER, url });
   }
-  
+
   next();
 }
 
@@ -348,7 +375,20 @@ app.use('/twiml', express.urlencoded({ extended: false }));
 // Raw body for webhook verification (OpenAI expects raw bytes)
 app.use('/openai/webhook', bodyParser.raw({ type: '*/*' }));
 
-const twilioClient = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
+// ─── Voice provider (Twilio by default) ─────────────────────────────────────
+// Instantiated once at startup. All telephony operations go through this.
+// Switch providers by setting VOICE_PROVIDER in .env.
+const voiceProvider: IVoiceProvider = createProvider(VOICE_PROVIDER, {
+  // Twilio fields (used when VOICE_PROVIDER=twilio)
+  accountSid: TWILIO_ACCOUNT_SID,
+  authToken: TWILIO_AUTH_TOKEN,
+  openAiProjectId: OPENAI_PROJECT_ID,
+  // Telnyx fields (used when VOICE_PROVIDER=telnyx — stub, not yet implemented)
+  apiKey: process.env.TELNYX_API_KEY ?? '',
+  sipConnectionId: process.env.TELNYX_SIP_CONNECTION_ID ?? '',
+});
+console.log(`[provider] Voice provider: ${VOICE_PROVIDER}`);
+
 const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
 
 app.get('/healthz', (_req, res) => res.status(200).json({ ok: true }));
@@ -381,7 +421,7 @@ app.post('/openclaw/ask', requireAuth, async (req: Request, res: Response) => {
  * Receives Twilio call status callbacks to help debug early hangups / SIP failures.
  * Security: Optional Twilio webhook signature validation (TWILIO_WEBHOOK_STRICT).
  */
-app.post('/twilio/status', validateTwilioWebhook, (req: Request, res: Response) => {
+app.post('/twilio/status', validateProviderWebhook, (req: Request, res: Response) => {
   try {
     const b = req.body as any;
     rememberInboundCallFromTwilioBody(b);
@@ -415,13 +455,16 @@ app.post('/twilio/status', validateTwilioWebhook, (req: Request, res: Response) 
  * Returns TwiML that bridges inbound PSTN calls (to your Twilio number) to OpenAI Realtime SIP.
  * Security: Optional Twilio webhook signature validation (TWILIO_WEBHOOK_STRICT).
  */
-app.post('/twilio/inbound', validateTwilioWebhook, async (req: Request, res: Response) => {
+app.post('/twilio/inbound', validateProviderWebhook, async (req: Request, res: Response) => {
   try {
     rememberInboundCallFromTwilioBody(req.body as any);
   } catch (e) {
     console.error('TWILIO_INBOUND remember error', e);
   }
-  res.type('text/xml').status(200).send(buildOpenAiSipBridgeTwiML());
+  res
+    .type(voiceProvider.responseContentType)
+    .status(200)
+    .send(voiceProvider.buildSipBridgeResponse());
 });
 
 /**
@@ -449,16 +492,16 @@ app.post('/call/outbound', requireAuth, async (req: Request, res: Response) => {
 
     const urlObj = new URL('/twiml/bridge', PUBLIC_BASE_URL);
     urlObj.searchParams.set('bridge_id', bridgeId);
-    const url = urlObj.toString();
+    const webhookUrl = urlObj.toString();
 
-    const call = await twilioClient.calls.create({
+    const call = await voiceProvider.createOutboundCall({
       to,
-      from: TWILIO_CALLER_ID,
-      url,
-      method: 'POST',
-      statusCallback,
+      from: VOICE_CALLER_ID,
+      webhookUrl,
+      webhookMethod: 'POST',
+      statusCallbackUrl: statusCallback,
       statusCallbackMethod: 'POST',
-      statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed']
+      statusCallbackEvents: ['initiated', 'ringing', 'answered', 'completed'],
     });
 
     // Persist outbound map so downstream log sync can show the dialed PSTN number.
@@ -511,9 +554,10 @@ app.post('/twiml/bridge', async (req: Request, res: Response) => {
 
   const objective = bridgeId ? (outboundIntentByKey.get(bridgeId)?.objective ?? '') : '';
 
-  res.type('text/xml')
+  res
+    .type(voiceProvider.responseContentType)
     .status(200)
-    .send(buildOpenAiSipBridgeTwiML({ callSid, bridgeId, objective }));
+    .send(voiceProvider.buildSipBridgeResponse({ callSid, bridgeId, objective }));
 });
 
 /**
@@ -882,23 +926,8 @@ function isE164(s: string): boolean {
   return /^\+[1-9]\d{1,14}$/.test(s);
 }
 
-function buildOpenAiSipBridgeTwiML(args?: { callSid?: string; bridgeId?: string; objective?: string }): string {
-  const twiml = new twilio.twiml.VoiceResponse();
-  const dial = twiml.dial({ answerOnBridge: true });
-
-  // IMPORTANT: Put correlation fields in the SIP URI *parameters* (after the userpart/host),
-  // not in the query string. Query params are not reliably surfaced as SIP headers.
-  // NOTE: Do NOT put the full objective here — long SIP URIs break the INVITE.
-  // The objective is resolved from the in-memory map via bridgeId in the webhook handler.
-  const uriParams: string[] = ['transport=tls'];
-  if (args?.callSid) uriParams.push(`x_twilio_callsid=${encodeURIComponent(args.callSid)}`);
-  if (args?.bridgeId) uriParams.push(`x_bridge_id=${encodeURIComponent(args.bridgeId)}`);
-
-  const uri = `sip:${OPENAI_PROJECT_ID}@sip.api.openai.com;${uriParams.join(';')}`;
-
-  dial.sip(uri);
-  return twiml.toString();
-}
+// buildOpenAiSipBridgeTwiML removed — logic lives in TwilioProvider.buildSipBridgeResponse()
+// All callers now use: voiceProvider.buildSipBridgeResponse({ callSid, bridgeId, objective })
 
 function buildInboundCallScreeningInstructions(args: { style: InboundCallScreeningStyle }): string {
   // If AGENT.md loaded, assemble from sections
