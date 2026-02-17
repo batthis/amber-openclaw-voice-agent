@@ -1,5 +1,5 @@
 ---
-name: Amber — Phone-Capable Voice Agent
+name: amber-voice-assistant
 description: "Phone-capable AI voice agent for OpenClaw: production-ready voice bridge (Twilio by default, provider-swappable via VOICE_PROVIDER) + OpenAI Realtime SIP, built-in call log dashboard, setup guidance, env templates, validation scripts, guardrail patterns, and troubleshooting runbooks. Supports inbound screening, outbound calls, appointment booking, and real-time OpenClaw knowledge lookups."
 homepage: https://github.com/batthis/amber-openclaw-voice-agent
 metadata: {"openclaw":{"emoji":"☎️","requires":{"env":["TWILIO_ACCOUNT_SID","TWILIO_AUTH_TOKEN","TWILIO_CALLER_ID","OPENAI_API_KEY","OPENAI_PROJECT_ID","OPENAI_WEBHOOK_SECRET","PUBLIC_BASE_URL"],"optionalEnv":["OPENCLAW_GATEWAY_URL","OPENCLAW_GATEWAY_TOKEN","BRIDGE_API_TOKEN","TWILIO_WEBHOOK_STRICT","VOICE_PROVIDER","VOICE_WEBHOOK_SECRET"],"anyBins":["node","ical-query"]},"primaryEnv":"OPENAI_API_KEY"}}
