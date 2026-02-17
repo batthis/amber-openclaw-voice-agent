@@ -91,7 +91,18 @@ async function main() {
 
   // Get default logs dir from env or process_logs.js defaults
   if (!args.logsDir) {
-    args.logsDir = process.env.LOGS_DIR || path.join(__dirname, '../runtime/logs');
+    const envLogsDir = process.env.LOGS_DIR;
+    const defaultLogsDir = path.join(__dirname, '../../runtime/logs');
+    if (envLogsDir) {
+      try {
+        args.logsDir = safePath(SKILL_ROOT, envLogsDir);
+      } catch (e) {
+        console.warn(`LOGS_DIR env validation failed (${envLogsDir}), using default:`, e.message);
+        args.logsDir = defaultLogsDir;
+      }
+    } else {
+      args.logsDir = defaultLogsDir;
+    }
   }
 
   let lastSig = null;

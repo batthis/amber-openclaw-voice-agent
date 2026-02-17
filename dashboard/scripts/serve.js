@@ -60,6 +60,16 @@ const server = http.createServer((req, res) => {
   });
 });
 
+// Warn if binding to a non-loopback address (exposes call logs to the network)
+const LOOPBACK_ADDRESSES = new Set(['127.0.0.1', '::1', 'localhost']);
+if (!LOOPBACK_ADDRESSES.has(args.host)) {
+  console.warn('');
+  console.warn('⚠️  WARNING: Dashboard is binding to a non-loopback address (' + args.host + ').');
+  console.warn('   This exposes call logs and transcripts to the network.');
+  console.warn('   Use --host 127.0.0.1 (default) unless you explicitly need remote access.');
+  console.warn('');
+}
+
 server.listen(args.port, args.host, () => {
   console.log(`Serving ${root}`);
   console.log(`Open: http://${args.host}:${args.port}/`);
