@@ -18,6 +18,7 @@ Amber is not a standalone voice agent — it operates as an extension of your Op
 - ⚡ **Launch in minutes** — `npm install`, configure `.env`, `npm start`
 - 🔒 **Safety guardrails** — operator approval for outbound calls, payment escalation, consent boundaries
 - 🎛️ **Fully configurable** — assistant name, operator info, org name, voice, screening style
+- 📝 **AGENT.md** — customize all prompts, greetings, booking flow, and personality in a single editable markdown file (no code changes needed)
 
 ## Quick Start
 
@@ -31,12 +32,20 @@ Point your Twilio voice webhook to `https://<your-domain>/twilio/inbound` — do
 
 ## What's Included
 
-| Directory | Description |
-|-----------|-------------|
+| Path | Description |
+|------|-------------|
+| `AGENT.md` | **Editable prompts & personality** — customize without touching code |
 | `runtime/` | Production-ready Twilio + OpenAI Realtime SIP bridge |
 | `dashboard/` | Call log web UI with search, filtering, transcripts |
 | `scripts/` | Setup quickstart and env validation |
 | `references/` | Architecture docs, env template, release checklist |
+| `UPGRADING.md` | Migration guide for major version upgrades |
+
+## Customizing Amber (AGENT.md)
+
+All voice prompts, conversational rules, booking flow, and greetings live in [`AGENT.md`](AGENT.md). Edit this file to change how Amber behaves — no TypeScript required.
+
+Template variables like `{{OPERATOR_NAME}}` and `{{ASSISTANT_NAME}}` are auto-replaced from your `.env` at runtime. See [UPGRADING.md](UPGRADING.md) for full details.
 
 ## Documentation
 

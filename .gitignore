@@ -1,0 +1,10 @@
+node_modules/
+dist/
+runtime/dist/
+runtime/node_modules/
+runtime/.env
+runtime/data/
+runtime/logs/
+runtime/package-lock.json
+*.log
+.DS_Store
