@@ -30,21 +30,12 @@ Most voice skills on ClawHub route calls through a managed service (Bland AI, VA
 - **Live call dashboard** — Real-time web UI with full transcripts, call history, captured messages, follow-up tracking, and search/filter. No other phone skill on ClawHub includes this.
 - **OpenClaw brain-in-the-loop** — The `ask_openclaw` tool delegates complex decisions back to your OpenClaw instance mid-call: calendar lookups, contact resolution, approval workflows — without hanging up.
 - **Inbound + outbound in one agent** — Handle incoming call screening and place outbound calls with the same config and the same agent.
-- **Multilingual auto-detection** — Amber detects the caller's language automatically and responds in kind. No configuration required.
+- **Multilingual auto-detection** — Amber detects the caller's language automatically and responds in kind. Supports Arabic, Spanish, French, and more via OpenAI Realtime. No configuration required.
+- **Natural conversation feel** — VAD tuning and verbal fillers keep conversations flowing with no dead air during lookups or processing.
 - **Provider-swappable architecture** — Twilio by default, swap to Telnyx or any supported carrier via `VOICE_PROVIDER`. No lock-in.
 - **Production security hardening** — Webhook signature validation, authenticated control endpoints, prompt injection defenses, and a startup check that fails loudly if secrets are missing in production.
 - **Full call history + follow-up tracking** — Every call is logged with transcript, summary, intent, and caller info. The dashboard surfaces unresolved follow-ups automatically.
-
-## Why Amber
-
-- **Launch a voice agent in minutes** — `npm install`, configure `.env`, `npm start`
-- Full inbound screening: greeting, message-taking, appointment booking with calendar integration
-- Outbound calls with structured call plans (reservations, inquiries, follow-ups)
-- **`ask_openclaw` tool** — voice agent consults your OpenClaw gateway mid-call for calendar, contacts, preferences
-- **Call log dashboard** — browse call history, read transcripts, track follow-ups, search by caller/number/content
-- **Automatic language detection** — Amber detects the caller's language and switches naturally mid-call (supports Arabic, Spanish, French, and more via OpenAI Realtime)
-- VAD tuning + verbal fillers to keep conversations natural (no dead air during lookups)
-- Fully configurable: assistant name, operator info, org name, calendar, screening style — all via env vars
+- **Fully configurable** — Assistant name, operator info, org name, calendar integration, and screening style all set via env vars. Launch in minutes: `npm install`, configure `.env`, `npm start`.
 - Operator safety guardrails for approvals/escalation/payment handling
 
 ## How tool calling works (`ask_openclaw`)
