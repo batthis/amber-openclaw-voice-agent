@@ -1,6 +1,6 @@
 ---
 name: amber-voice-assistant
-description: "Phone-capable AI voice agent for OpenClaw: production-ready voice bridge (Twilio by default, provider-swappable via VOICE_PROVIDER) + OpenAI Realtime SIP, built-in call log dashboard, setup guidance, env templates, validation scripts, guardrail patterns, and troubleshooting runbooks. Supports inbound screening, outbound calls, appointment booking, and real-time OpenClaw knowledge lookups."
+description: "The most complete phone skill for OpenClaw. Production-ready, low-latency AI calls — inbound & outbound, multilingual, live dashboard, brain-in-the-loop."
 homepage: https://github.com/batthis/amber-openclaw-voice-agent
 metadata: {"openclaw":{"emoji":"☎️","requires":{"env":["TWILIO_ACCOUNT_SID","TWILIO_AUTH_TOKEN","TWILIO_CALLER_ID","OPENAI_API_KEY","OPENAI_PROJECT_ID","OPENAI_WEBHOOK_SECRET","PUBLIC_BASE_URL"],"optionalEnv":["OPENCLAW_GATEWAY_URL","OPENCLAW_GATEWAY_TOKEN","BRIDGE_API_TOKEN","TWILIO_WEBHOOK_STRICT","VOICE_PROVIDER","VOICE_WEBHOOK_SECRET"],"anyBins":["node","ical-query"]},"primaryEnv":"OPENAI_API_KEY"}}
 ---
@@ -20,6 +20,20 @@ Amber handles inbound call screening, outbound calls, appointment booking, live 
 - **Setup & validation scripts** — preflight checks, env templates, quickstart runner
 - **Architecture docs & troubleshooting** — call flow diagrams, common failure runbooks
 - **Safety guardrails** — approval patterns for outbound calls, payment escalation, consent boundaries
+
+## Why Amber vs. Other Voice Skills
+
+Most voice skills on ClawHub route calls through a managed service (Bland AI, VAPI, Pamela). Amber takes a different approach: you own the stack, and your OpenClaw brain stays connected throughout the entire call.
+
+**What Amber has that other phone skills don't:**
+
+- **Live call dashboard** — Real-time web UI with full transcripts, call history, captured messages, follow-up tracking, and search/filter. No other phone skill on ClawHub includes this.
+- **OpenClaw brain-in-the-loop** — The `ask_openclaw` tool delegates complex decisions back to your OpenClaw instance mid-call: calendar lookups, contact resolution, approval workflows — without hanging up.
+- **Inbound + outbound in one agent** — Handle incoming call screening and place outbound calls with the same config and the same agent.
+- **Multilingual auto-detection** — Amber detects the caller's language automatically and responds in kind. No configuration required.
+- **Provider-swappable architecture** — Twilio by default, swap to Telnyx or any supported carrier via `VOICE_PROVIDER`. No lock-in.
+- **Production security hardening** — Webhook signature validation, authenticated control endpoints, prompt injection defenses, and a startup check that fails loudly if secrets are missing in production.
+- **Full call history + follow-up tracking** — Every call is logged with transcript, summary, intent, and caller info. The dashboard surfaces unresolved follow-ups automatically.
 
 ## Why Amber
 
