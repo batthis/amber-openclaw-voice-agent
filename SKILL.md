@@ -5,11 +5,11 @@ homepage: https://github.com/batthis/amber-openclaw-voice-agent
 metadata: {"openclaw":{"emoji":"☎️","requires":{"env":["TWILIO_ACCOUNT_SID","TWILIO_AUTH_TOKEN","TWILIO_CALLER_ID","OPENAI_API_KEY","OPENAI_PROJECT_ID","OPENAI_WEBHOOK_SECRET","PUBLIC_BASE_URL"],"optionalEnv":["OPENCLAW_GATEWAY_URL","OPENCLAW_GATEWAY_TOKEN","BRIDGE_API_TOKEN","TWILIO_WEBHOOK_STRICT","VOICE_PROVIDER","VOICE_WEBHOOK_SECRET"],"anyBins":["node","ical-query"]},"primaryEnv":"OPENAI_API_KEY"}}
 ---
 
-# Amber Voice Assistant
+# Amber — Phone-Capable Voice Agent
 
 ## Overview
 
-Amber Voice Assistant gives any OpenClaw deployment a phone-capable voice assistant. It ships with a **production-ready Twilio + OpenAI Realtime SIP bridge** (`runtime/`) that handles inbound call screening, outbound calls, appointment booking, and live OpenClaw knowledge lookups — all via natural voice conversation.
+Amber gives any OpenClaw deployment a phone-capable voice assistant. It ships with a **production-ready Twilio + OpenAI Realtime SIP bridge** (`runtime/`) that handles inbound call screening, outbound calls, appointment booking, and live OpenClaw knowledge lookups — all via natural voice conversation.
 
 **✨ New:** Interactive setup wizard (`npm run setup`) validates credentials in real-time and generates a working `.env` file — no manual configuration needed!
 
