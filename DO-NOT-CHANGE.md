@@ -4,11 +4,12 @@
 
 ## Fixed Branding (DO NOT MODIFY unless explicitly instructed by Abe)
 
-### Title Field (frontmatter in SKILL.md)
-```yaml
-title: "Amber — Phone-Capable Voice Agent"
+### ClawHub Publish Command --name Flag
+```bash
+clawhub publish ~/clawd/skills/amber-voice-assistant --version X.Y.Z --name "Amber — Phone-Capable Voice Agent" --changelog "..."
 ```
-**This is the display title on ClawHub.**  
+**This is what sets the display title on ClawHub!**  
+The frontmatter fields do NOT control the ClawHub display name.  
 **NOT:** "Amber Voice Assistant"  
 **NOT:** "Amber Voice Agent"  
 **NOT:** Any other variation
@@ -17,7 +18,7 @@ title: "Amber — Phone-Capable Voice Agent"
 ```markdown
 # Amber — Phone-Capable Voice Agent
 ```
-Should match the frontmatter title field.
+For documentation consistency (but doesn't affect ClawHub display).
 
 ### Description (frontmatter in SKILL.md)
 ```
@@ -37,7 +38,11 @@ Because I (Jarvis) keep making mistakes with the title/branding. This file is he
 
 **Mistake history:**
 - 2026-02-21 v4.2.2: Reverted title to "Amber Voice Assistant" in H1 heading
-- 2026-02-21 v4.2.3: Fixed H1 but forgot to add `title` field to frontmatter (ClawHub still showed wrong name)
-- 2026-02-21 v4.2.4: Finally added both the H1 AND the frontmatter `title` field
+- 2026-02-21 v4.2.3: Fixed H1 but ClawHub still showed wrong name
+- 2026-02-21 v4.2.4: Added `title` field to frontmatter (but ClawHub doesn't use frontmatter for display name!)
+- 2026-02-21 v4.2.5: **FINALLY** discovered the `--name` flag on `clawhub publish` command
 
-**The lesson:** BOTH the frontmatter `title:` field AND the H1 heading must be set to "Amber — Phone-Capable Voice Agent"
+**The lesson:** 
+- ClawHub display name is set via the `--name` flag during publish, NOT via frontmatter
+- Frontmatter fields in SKILL.md do NOT control the ClawHub listing page title
+- The publish command must include: `--name "Amber — Phone-Capable Voice Agent"`
