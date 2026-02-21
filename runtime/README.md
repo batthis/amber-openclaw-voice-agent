@@ -20,20 +20,35 @@ A production-ready Twilio + OpenAI Realtime SIP bridge that enables voice conver
 - Twilio account with a phone number
 - OpenAI account with Realtime API access
 - (Optional) OpenClaw gateway running locally
+- (Optional) ngrok for easy public URL setup
 
-### 2. Installation
+### 2. Interactive Setup (Recommended) ✨
+
+![Setup Wizard Demo](../demo/demo.gif)
+
+Run the setup wizard for guided installation:
 
 ```bash
 cd skills/amber-voice-assistant/runtime
-npm install
+npm run setup
 ```
 
-### 3. Configuration
+The wizard will:
+- ✅ Validate your Twilio and OpenAI credentials in real-time
+- 🌐 Auto-detect and configure ngrok if available
+- 📝 Generate a working `.env` file
+- 🔧 Optionally install dependencies and build the project
+- 📋 Show you exactly where to configure Twilio webhooks
 
-Copy the example environment file and configure it:
+Then just start the server and call your number!
+
+### 3. Manual Configuration (Alternative)
+
+If you prefer to configure manually:
 
 ```bash
-cp references/env.example .env
+npm install
+cp ../references/env.example .env
 ```
 
 Edit `.env` with your credentials:
