@@ -9,6 +9,8 @@ import OpenAI from 'openai';
 import WebSocket from 'ws';
 import { createProvider } from './providers/index.js';
 import type { IVoiceProvider } from './providers/index.js';
+import { loadSkills, registerSkills, isSkillFunction, getSkillTools, handleSkillCall } from './skills/index.js';
+import type { HandleSkillCallDeps } from './skills/index.js';
 
 // ─── Security Helpers ───
 
@@ -338,6 +340,11 @@ const OPENCLAW_TOOLS = [
   },
 ];
 
+/** Get all tools — OPENCLAW_TOOLS + dynamically loaded Amber Skills */
+function getAllTools() {
+  return [...OPENCLAW_TOOLS, ...getSkillTools()];
+}
+
 // Active call websockets keyed by callId, so we can interact with them
 const activeCallSockets = new Map<string, WebSocket>();
 
@@ -662,7 +669,7 @@ const callAccept = {
       instructions,
       type: 'realtime',
       model: 'gpt-realtime',
-      tools: OPENCLAW_TOOLS,
+      tools: getAllTools(),
       tool_choice: 'auto',
       audio: {
         output: { voice: OPENAI_VOICE },
@@ -746,7 +753,7 @@ const callAccept = {
         const sessionUpdate = {
           type: 'session.update',
           session: {
-            tools: OPENCLAW_TOOLS,
+            tools: getAllTools(),
             tool_choice: 'auto',
             turn_detection: {
               type: 'server_vad',
@@ -757,7 +764,7 @@ const callAccept = {
           },
         };
         ws.send(JSON.stringify(sessionUpdate));
-        writeJsonl({ type: 'c2.tools_registered', call_id: callId, received_at: new Date().toISOString(), toolCount: OPENCLAW_TOOLS.length });
+        writeJsonl({ type: 'c2.tools_registered', call_id: callId, received_at: new Date().toISOString(), toolCount: getAllTools().length });
       }
 
       const responseCreate = {
@@ -889,6 +896,20 @@ const callAccept = {
           writeJsonl({ type: 'c2.filler_sent', call_id: callId, received_at: new Date().toISOString(), filler: fillerInstruction });
 
           handleAskOpenClaw(ws, callId, itemId, fnCallId, fnArgs, outboundObjective, outboundCallPlan, transcriptStream, writeJsonl);
+        } else if (isSkillFunction(fnName)) {
+          // Route to Amber Skills system
+          const skillDeps: HandleSkillCallDeps = {
+            clawdClient,
+            operatorName: OPERATOR_NAME || '',
+            operatorTelegramId: undefined, // determined by OpenClaw gateway routing
+            callId,
+            callerId: inbound?.from || '',
+            transcript: '', // transcript is streaming; skills get what's available
+            writeJsonl,
+            sendFunctionCallOutput: (wsRef: any, fCallId: string, output: string) =>
+              sendFunctionCallOutput(wsRef, fCallId, output),
+          };
+          handleSkillCall(fnName, fnArgs, ws, fnCallId, skillDeps);
         } else {
           // Unknown function — return a generic error
           sendFunctionCallOutput(ws, fnCallId, JSON.stringify({ error: `Unknown function: ${fnName}` }));
@@ -935,6 +956,11 @@ const callAccept = {
     return res.status(500).send('Server error');
   }
 });
+
+// ─── Load Amber Skills at startup ───
+const SKILLS_DIR = path.resolve(new URL('.', import.meta.url).pathname, '../../amber-skills');
+const loadedSkills = loadSkills(SKILLS_DIR);
+registerSkills(loadedSkills);
 
 app.listen(PORT, () => {
   console.log(`twilio-openai-sip-bridge listening on http://127.0.0.1:${PORT}`);
