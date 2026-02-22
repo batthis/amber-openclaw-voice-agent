@@ -1522,8 +1522,8 @@ async function askOpenClawViaChatCompletions(
   }
 
   try {
-    const completion = await clawdClient.chat.completions.create({
-      model: 'anthropic/claude-haiku-4-5',
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o',
       max_tokens: 150,
       temperature: 0.3,
       messages: [
