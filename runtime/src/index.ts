@@ -409,6 +409,12 @@ console.log(`[provider] Voice provider: ${VOICE_PROVIDER}`);
 
 const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
 
+// OpenClaw gateway client — routes to Claude via Pro token (no OpenAI API charges)
+const clawdClient = new OpenAI({
+  apiKey: OPENCLAW_GATEWAY_TOKEN || 'no-token',
+  baseURL: `${OPENCLAW_GATEWAY_URL}/v1`,
+});
+
 app.get('/healthz', (_req, res) => res.status(200).json({ ok: true }));
 
 /**
@@ -1516,8 +1522,8 @@ async function askOpenClawViaChatCompletions(
   }
 
   try {
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o',
+    const completion = await clawdClient.chat.completions.create({
+      model: 'anthropic/claude-haiku-4-5',
       max_tokens: 150,
       temperature: 0.3,
       messages: [
