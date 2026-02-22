@@ -3,6 +3,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { URL } = require('url');
+const { spawn } = require('child_process');
 
 function parseArgs(argv) {
   const args = { port: 8787, host: '127.0.0.1' };
@@ -35,6 +36,34 @@ if (args.help) {
 const root = path.resolve(__dirname, '..');
 
 const server = http.createServer((req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') { res.writeHead(200); res.end(); return; }
+
+  // POST /api/sync — manually trigger process_logs.js
+  if (req.method === 'POST' && req.url === '/api/sync') {
+    const processLogsPath = path.resolve(root, 'process_logs.js');
+    const startTime = Date.now();
+    const child = spawn(process.execPath, [processLogsPath], { env: process.env, timeout: 120000 });
+    let stdout = '', stderr = '';
+    child.stdout.on('data', d => { stdout += d; });
+    child.stderr.on('data', d => { stderr += d; });
+    child.on('close', code => {
+      const durationMs = Date.now() - startTime;
+      console.log(`[sync] process_logs.js exited ${code} in ${durationMs}ms`);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: code === 0, exitCode: code, durationMs,
+        output: stdout.trim().split('\n').slice(-5).join('\n'), error: stderr.trim() || null }));
+    });
+    child.on('error', err => {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: err.message }));
+    });
+    return;
+  }
+
   const u = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   let pathname = decodeURIComponent(u.pathname);
   if (pathname === '/') pathname = '/index.html';

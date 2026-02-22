@@ -43,6 +43,26 @@ Point your Twilio voice webhook to `https://<your-domain>/twilio/inbound` — do
 | `references/` | Architecture docs, env template, release checklist |
 | `UPGRADING.md` | Migration guide for major version upgrades |
 
+## Call Log Dashboard
+
+Browse call history, transcripts, and captured messages in a local web UI:
+
+```bash
+cd dashboard
+node scripts/serve.js       # serves on http://localhost:8787
+```
+
+Then open [http://localhost:8787](http://localhost:8787) in your browser.
+
+| Button | Action |
+|--------|--------|
+| **⬇ (green)** | **Sync** — pull new calls from bridge logs and refresh data |
+| **↻ (blue)** | Reload existing data from disk (no re-processing) |
+
+> **Tip:** Use the **⬇ Sync** button right after a call ends to immediately pull it into the dashboard without waiting for the background watcher.
+
+The dashboard auto-updates every 30 seconds when the watcher is running (`node scripts/watch.js`).
+
 ## Customizing Amber (AGENT.md)
 
 All voice prompts, conversational rules, booking flow, and greetings live in [`AGENT.md`](AGENT.md). Edit this file to change how Amber behaves — no TypeScript required.

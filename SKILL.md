@@ -25,9 +25,20 @@ Amber gives any OpenClaw deployment a phone-capable voice assistant. It ships wi
 ### What's included
 
 - **Runtime bridge** (`runtime/`) — a complete Node.js server that connects Twilio phone calls to OpenAI Realtime with OpenClaw brain-in-the-loop
+- **Call log dashboard** (`dashboard/`) — browse call history, transcripts, and captured messages; includes **manual Sync button** to pull new calls on demand
 - **Setup & validation scripts** — preflight checks, env templates, quickstart runner
 - **Architecture docs & troubleshooting** — call flow diagrams, common failure runbooks
 - **Safety guardrails** — approval patterns for outbound calls, payment escalation, consent boundaries
+
+### Call log dashboard
+
+```bash
+cd dashboard && node scripts/serve.js   # → http://localhost:8787
+```
+
+- **⬇ Sync button** (green) — immediately pulls new calls from `runtime/logs/` and refreshes the dashboard. Use this right after a call ends rather than waiting for the background watcher.
+- **↻ Refresh button** (blue) — reloads existing data from disk without re-processing logs.
+- Background watcher (`node scripts/watch.js`) auto-syncs every 30 seconds when running.
 
 ## Why Amber
 
