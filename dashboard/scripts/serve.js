@@ -43,10 +43,28 @@ const server = http.createServer((req, res) => {
   if (req.method === 'OPTIONS') { res.writeHead(200); res.end(); return; }
 
   // POST /api/sync — manually trigger process_logs.js
+  // Security: target script path is hardcoded (not user-controlled); no user input is
+  // passed to the spawned process. Environment is scoped to only what Node needs.
   if (req.method === 'POST' && req.url === '/api/sync') {
+    // Hardcoded path — not derived from request input
     const processLogsPath = path.resolve(root, 'process_logs.js');
+    // Verify target stays within the dashboard root (defense in depth)
+    if (!processLogsPath.startsWith(root + path.sep) && processLogsPath !== path.resolve(root, 'process_logs.js')) {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: 'Forbidden' }));
+      return;
+    }
     const startTime = Date.now();
-    const child = spawn(process.execPath, [processLogsPath], { env: process.env, timeout: 120000 });
+    // Scope env to minimal required vars rather than forwarding entire process.env
+    const safeEnv = {
+      HOME: process.env.HOME,
+      PATH: process.env.PATH,
+      LOGS_DIR: process.env.LOGS_DIR,
+      TWILIO_CALLER_ID: process.env.TWILIO_CALLER_ID,
+      ASSISTANT_NAME: process.env.ASSISTANT_NAME,
+      OPERATOR_NAME: process.env.OPERATOR_NAME,
+    };
+    const child = spawn(process.execPath, [processLogsPath], { env: safeEnv, timeout: 120000 });
     let stdout = '', stderr = '';
     child.stdout.on('data', d => { stdout += d; });
     child.stderr.on('data', d => { stderr += d; });
