@@ -863,7 +863,13 @@ const callAccept = {
       writeJsonl({ received_at: receivedAt, event: parsed });
 
       for (const t of extractTranscriptStrings(parsed)) {
-        transcriptStream.write(`${t}\n`);
+        // Strip SUMMARY_JSON lines before writing to transcript log.
+        // SUMMARY_JSON is silent backend metadata — it must not appear
+        // in operator dashboards, call logs, or any transcript view.
+        const cleanedTranscript = stripSummaryJsonFromTranscript(t);
+        if (cleanedTranscript.trim()) {
+          transcriptStream.write(`${cleanedTranscript}\n`);
+        }
       }
 
       // Phase C2: Handle function call events
@@ -1921,4 +1927,24 @@ function parseSummaryJsonFromTranscript(transcript: string): any | null {
     }
   }
   return null;
+}
+
+/**
+ * Strip SUMMARY_JSON lines from a transcript before it is stored in call logs
+ * or sent to any downstream consumer.
+ *
+ * SUMMARY_JSON is silent metadata emitted by the AI model at the end of a call
+ * (e.g. {"name":"...", "message":"..."}). It must NEVER be:
+ *   - Spoken aloud to the caller (enforced via system prompt)
+ *   - Exposed in dashboard transcript views (stripped here before logging)
+ *   - Sent back to the model in subsequent context (stripped here)
+ *
+ * This function removes any line containing SUMMARY_JSON: from the transcript
+ * so only human-readable conversation content reaches logs and UI.
+ */
+function stripSummaryJsonFromTranscript(transcript: string): string {
+  return transcript
+    .split(/\r?\n/)
+    .filter(line => !line.includes('SUMMARY_JSON:'))
+    .join('\n');
 }

@@ -15,6 +15,28 @@ This is a policy enforcement layer: it keeps honest skill handlers within their 
 
 Included skills (`calendar`, `send-message`) are audited and follow declared permissions exactly.
 
+## Allowlist Enforcement (SKILL_MANIFEST.json)
+
+The loader reads `amber-skills/SKILL_MANIFEST.json` **before** loading any handler. Only skill directory names listed in `approvedSkills` will have their `handler.js` required. Any directory not in the allowlist is skipped unconditionally — no handler code is executed, no SKILL.md is parsed.
+
+```json
+{
+  "approvedSkills": ["calendar", "send-message"]
+}
+```
+
+To add a new skill, its name must appear in `approvedSkills`. This makes the set of loaded JavaScript files statically auditable from a single file without reading all of `loader.ts`.
+
+## Router-Level Confirmation Enforcement
+
+Skills that declare `confirmation_required: true` in their manifest receive **programmatic enforcement** at the router layer, not just model-prompt guidance:
+
+- The router checks `params.confirmed === true` before invoking any `act` skill with `confirmation_required: true`
+- If `confirmed` is absent or false, the router returns a `requires_confirmation: true` error response **without calling the handler**
+- The model receives the error and must get explicit caller confirmation before retrying with `confirmed: true`
+
+This means safety-critical actions (e.g., sending messages) cannot be invoked by the model without a confirmed flag, regardless of what the system prompt says. The confirmation requirement is enforced in code, not just by instructions.
+
 ## Current Architecture (don't break this)
 
 - `runtime/src/index.ts` (~1880 lines) is the main entry point

@@ -88,9 +88,15 @@ function validateManifest(data: Record<string, any>, skillDir: string): AmberSki
 
 /**
  * Load the approved skill list from SKILL_MANIFEST.json.
- * Only skills explicitly listed in approvedSkills will be loaded.
- * This provides an explicit allowlist so the runtime never loads
- * unexpected or unreviewed handler.js files.
+ *
+ * SECURITY: This function MUST be called before any handler.js is loaded.
+ * The returned Set is used as an explicit allowlist — only skill directories
+ * whose names appear in approvedSkills will have their handler.js required().
+ * Any directory in amber-skills/ that is NOT in this allowlist is skipped
+ * unconditionally, even if it has a valid SKILL.md and handler.js.
+ *
+ * To add a new skill: add its directory name to the approvedSkills array
+ * in amber-skills/SKILL_MANIFEST.json and restart the runtime.
  */
 function loadApprovedSkills(skillsDir: string): Set<string> {
   const manifestPath = path.join(skillsDir, 'SKILL_MANIFEST.json');

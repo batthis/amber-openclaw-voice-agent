@@ -151,6 +151,22 @@ export async function handleSkillCall(
     }
     params = sanitizeParams(params);
 
+    // Router-level confirmation enforcement for 'act' skills.
+    // If the skill manifest declares confirmation_required: true, the model
+    // MUST pass confirmed: true in params before the handler is invoked.
+    // This is a programmatic guarantee — separate from any model-level prompting.
+    const isActSkill = manifest.amber.capabilities.includes('act');
+    if (isActSkill && manifest.amber.confirmation_required === true) {
+      if (params.confirmed !== true) {
+        deps.sendFunctionCallOutput(ws, fnCallId, JSON.stringify({
+          response: 'This action requires explicit caller confirmation before it can proceed. Please confirm the details with the caller and call this function again with confirmed: true.',
+          success: false,
+          requires_confirmation: true,
+        }));
+        return;
+      }
+    }
+
     // Build constrained API context
     const apiDeps: ApiDependencies = {
       clawdClient: deps.clawdClient,
