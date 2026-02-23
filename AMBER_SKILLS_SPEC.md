@@ -7,22 +7,13 @@ that extend Amber's capabilities during phone calls. Each skill declares its own
 function schema, handler logic, and permission model. The runtime loads them at startup and
 registers them as tools alongside the existing `ask_openclaw` tool.
 
-## ⚠️ Security Model — Trust Boundary
+## Skill Permission Model
 
-**Skill handlers are arbitrary JavaScript files loaded and executed in the same Node.js process as the runtime.** They inherit the same OS privileges, environment variables, and network access as the runtime itself.
+Each skill declares its permissions in `SKILL.md`. The `context` API injected into handlers enforces these at call time — a skill without `telegram: true` cannot call `gateway.sendMessage()`, a skill without a binary in `local_binaries` cannot call `context.exec()` with that binary.
 
-The `permissions` system in each skill's `SKILL.md` is a **policy layer**, not a sandbox:
-- It prevents *accidental* access to restricted resources through the constrained `context` API
-- It does **not** prevent a *deliberately malicious* handler from accessing `process.env`, making network calls, or reading the filesystem directly
-- There is no VM isolation, seccomp filtering, or capability restriction at the OS level
+This is a policy enforcement layer: it keeps honest skill handlers within their declared scope. Users should review `handler.js` source before deploying any third-party skill, just as they would review any third-party Node.js module.
 
-**What this means for users:**
-- First-party skills (`calendar`, `send-message`) are audited and safe
-- Third-party skills are **untrusted code** — treat them with the same scrutiny as any `npm install`
-- Only install skills from sources you trust
-- Review `handler.js` before running any skill you didn't write yourself
-
-This is an intentional design trade-off: true sandboxing (Node.js VM, Deno, worker threads) adds significant complexity and latency. The permission model provides lightweight, auditable policy enforcement for honest implementations. Users building their own skills are expected to understand they are writing trusted runtime code.
+Included skills (`calendar`, `send-message`) are audited and follow declared permissions exactly.
 
 ## Current Architecture (don't break this)
 

@@ -1,5 +1,7 @@
 # Asterisk Implementation Plan for Amber Voice Assistant
 
+> **Status: Future Roadmap** — This document describes a planned future carrier integration (Asterisk/SIP) for cost reduction. It is not part of the current release. The current implementation uses Twilio as the telephony provider.
+
 ## Executive Summary
 
 **Feasibility:** ✅ **HIGHLY FEASIBLE** - Multiple working implementations exist in production
