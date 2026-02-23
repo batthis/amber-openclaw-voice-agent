@@ -1,29 +1,34 @@
 ---
 name: calendar
-version: 1.0.0
-description: "Query and manage the operator's calendar — look up events, check availability, and create new entries"
-metadata: {"amber": {"capabilities": ["read", "act"], "confirmation_required": false, "timeout_ms": 5000, "permissions": {"local_binaries": ["ical-query"], "telegram": false, "openclaw_action": false, "network": false}, "function_schema": {"name": "calendar_query", "description": "Look up calendar events, check availability, or create a new calendar entry. For lookups use action 'lookup'. For creating events use action 'create'. Use this tool for any calendar-related questions — do NOT use ask_openclaw for calendar queries.", "parameters": {"type": "object", "properties": {"action": {"type": "string", "enum": ["lookup", "create"], "description": "Whether to look up existing events or create a new one"}, "range": {"type": "string", "description": "For lookup: today, tomorrow, week, or a specific date range like 2026-02-22"}, "title": {"type": "string", "description": "For create: the event title"}, "start": {"type": "string", "description": "For create: start date-time like 2026-02-22T15:00"}, "end": {"type": "string", "description": "For create: end date-time like 2026-02-22T16:00"}, "calendar": {"type": "string", "description": "Optional: specific calendar name"}, "notes": {"type": "string", "description": "For create: event notes"}, "location": {"type": "string", "description": "For create: event location"}}, "required": ["action"]}}}}
+version: 1.1.0
+description: "Query and manage the operator's calendar — check availability and create new entries"
+metadata: {"amber": {"capabilities": ["read", "act"], "confirmation_required": false, "timeout_ms": 5000, "permissions": {"local_binaries": ["ical-query"], "telegram": false, "openclaw_action": false, "network": false}, "function_schema": {"name": "calendar_query", "description": "Check the operator's calendar availability or create a new entry. PRIVACY RULE: When reporting availability to callers, NEVER disclose event titles, names, locations, or any details about what the operator is doing. Only share whether they are free or busy at a given time (e.g. 'free from 2pm to 4pm', 'busy until 3pm'). Treat all calendar event details as private and confidential.", "parameters": {"type": "object", "properties": {"action": {"type": "string", "enum": ["lookup", "create"], "description": "Whether to look up availability or create a new event"}, "range": {"type": "string", "description": "For lookup: today, tomorrow, week, or a specific date like 2026-02-23"}, "title": {"type": "string", "description": "For create: the event title"}, "start": {"type": "string", "description": "For create: start date-time like 2026-02-23T15:00"}, "end": {"type": "string", "description": "For create: end date-time like 2026-02-23T16:00"}, "calendar": {"type": "string", "description": "Optional: specific calendar name"}, "notes": {"type": "string", "description": "For create: event notes"}, "location": {"type": "string", "description": "For create: event location"}}, "required": ["action"]}}}}
 ---
 
 # Calendar Skill
 
-Query and manage the operator's calendar via the local `ical-query` CLI (Apple Calendar / EventKit).
+Query the operator's calendar for availability and create new entries via `ical-query`.
 
 ## Capabilities
 
-- **read**: Look up events for today, tomorrow, this week, or a specific date range
-- **act**: Create new calendar entries with title, time, location, and notes
+- **read**: Check free/busy availability for today, tomorrow, this week, or a specific date
+- **act**: Create new calendar entries
 
-## Usage
+## Privacy Rule
 
-During a call, when someone asks about availability or wants to schedule something:
-1. Amber calls `calendar_query` with `action: "lookup"` to check availability
-2. If scheduling is needed, Amber calls `calendar_query` with `action: "create"`
+**Event details are never disclosed to callers.** This is enforced at two levels:
+
+1. **Handler level** — the handler strips all event titles, names, locations, and notes from ical-query output before returning results. Only busy time slots (start/end times) are returned.
+2. **Model level** — the function description instructs Amber to only communicate availability ("free from 2pm to 4pm") and never reveal what the events are.
+
+Amber should say things like:
+- ✅ "The operator is free between 2 and 4 this afternoon"
+- ✅ "They're busy until 3pm, then free for the rest of the day"
+- ❌ "They have a meeting with John at 2pm" ← never
+- ❌ "They're at the dentist from 10 to 11" ← never
 
 ## Notes
 
-- Uses `/usr/local/bin/ical-query` — no network access required
-- Calendar name is optional — defaults to the operator's primary calendar
-- No confirmation required — lookups are read-safe, and creation is confirmed
-  verbally during the natural conversation flow
-- This skill replaces the need to route calendar queries through ask_openclaw
+- Uses `/usr/local/bin/ical-query` — no network access, no gateway round-trip
+- Fast: direct local binary call (~100ms)
+- Calendar name optional — defaults to operator's primary calendar
