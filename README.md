@@ -32,11 +32,48 @@ Point your Twilio voice webhook to `https://<your-domain>/twilio/inbound` — do
 
 > **Switching providers?** Set `VOICE_PROVIDER=telnyx` (or another supported provider) in your `.env` — no code changes needed. See [SKILL.md](SKILL.md) for details.
 
+## 🔌 Amber Skills — Extensible by Design
+
+Amber ships with a growing library of **Amber Skills** — modular capabilities that plug directly into live voice conversations. Each skill exposes a structured function that Amber can call mid-call, letting you compose powerful voice workflows without touching the bridge code.
+
+Two skills are included out of the box:
+
+### 📅 Calendar
+
+Query the operator's calendar for availability or schedule a new event — all during a live call.
+
+- **Availability lookups** — free/busy slots for today, tomorrow, this week, or any specific date
+- **Event creation** — book appointments directly into the operator's calendar from a phone conversation
+- **Privacy by default** — callers are only told whether the operator is free or busy; event titles, names, and locations are never disclosed
+- Powered by `ical-query` — local-only, zero network latency
+
+### 📬 Log & Forward Message
+
+Let callers leave a message that is automatically saved and forwarded to the operator.
+
+- Captures the caller's message, name, and optional callback number
+- **Always saves to the call log first** (audit trail), then delivers via the operator's configured messaging channel
+- Confirmation-gated — Amber confirms with the caller before sending
+- Delivery destination is operator-configured — callers cannot redirect messages
+
+### Build Your Own Skills
+
+Amber's skill system is designed to grow. Each skill is a self-contained directory with a `SKILL.md` (metadata + function schema) and a `handler.js`. You can:
+
+- **Customize the included skills** to fit your own setup
+- **Build new skills** for your use case — CRM lookups, inventory checks, custom notifications, anything callable mid-call
+- **Share skills** with the OpenClaw community via [ClawHub](https://clawhub.com)
+
+See [`amber-skills/`](amber-skills/) for examples and the full specification to get started.
+
+---
+
 ## What's Included
 
 | Path | Description |
 |------|-------------|
 | `AGENT.md` | **Editable prompts & personality** — customize without touching code |
+| `amber-skills/` | Built-in Amber Skills (calendar, log & forward message) + skill spec |
 | `runtime/` | Production-ready voice bridge (Twilio default) + OpenAI Realtime SIP |
 | `dashboard/` | Call log web UI with search, filtering, transcripts |
 | `scripts/` | Setup quickstart and env validation |
