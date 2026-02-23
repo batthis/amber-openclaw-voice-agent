@@ -3,6 +3,10 @@
  * 
  * Saves a caller's message to the call log and delivers it
  * to the operator via their configured messaging channel.
+ * 
+ * Telegram delivery is fire-and-forget — the caller gets instant
+ * confirmation after the call log write. The gateway round-trip
+ * happens in the background.
  */
 
 /**
@@ -29,7 +33,7 @@ module.exports = async function sendMessageHandler(params, context) {
     };
   }
 
-  // Step 1: ALWAYS write to call log first (audit trail)
+  // Step 1: ALWAYS write to call log first (audit trail) — this is the critical path
   const logEntry = {
     type: 'skill.send_message',
     caller_name: cleanName || 'Unknown',
@@ -41,41 +45,40 @@ module.exports = async function sendMessageHandler(params, context) {
 
   context.callLog.write(logEntry);
 
-  // Step 2: Attempt delivery via operator's messaging channel
-  let delivered = false;
-  try {
-    const operatorName = context.operator.name || 'operator';
-    const emoji = cleanUrgency === 'urgent' ? '🚨' : '📞';
+  // Step 2: Fire-and-forget delivery via operator's messaging channel
+  // Do NOT await — the gateway round-trip can take 10-30 seconds through OpenClaw.
+  // The caller gets instant confirmation; delivery happens in the background.
+  const operatorName = context.operator.name || 'operator';
+  const emoji = cleanUrgency === 'urgent' ? '🚨' : '📞';
 
-    const formattedMessage = [
-      `${emoji} Message from a call:`,
-      '',
-      cleanName ? `From: ${cleanName}` : null,
-      cleanCallback ? `Callback: ${cleanCallback}` : null,
-      cleanUrgency === 'urgent' ? 'Priority: URGENT' : null,
-      '',
-      cleanMessage,
-    ]
-      .filter(function (line) { return line !== null; })
-      .join('\n');
+  const formattedMessage = [
+    `${emoji} Message from a call:`,
+    '',
+    cleanName ? `From: ${cleanName}` : null,
+    cleanCallback ? `Callback: ${cleanCallback}` : null,
+    cleanUrgency === 'urgent' ? 'Priority: URGENT' : null,
+    '',
+    cleanMessage,
+  ]
+    .filter(function (line) { return line !== null; })
+    .join('\n');
 
-    await context.gateway.sendMessage(formattedMessage);
-    delivered = true;
-
-    // Log delivery success
-    context.callLog.write({
-      type: 'skill.send_message.delivered',
-      delivery_channel: 'openclaw_gateway',
+  // Fire and forget — log success/failure asynchronously
+  context.gateway.sendMessage(formattedMessage)
+    .then(function () {
+      context.callLog.write({
+        type: 'skill.send_message.delivered',
+        delivery_channel: 'openclaw_gateway',
+      });
+    })
+    .catch(function (e) {
+      context.callLog.write({
+        type: 'skill.send_message.delivery_failed',
+        error: e && e.message ? e.message : String(e),
+      });
     });
-  } catch (e) {
-    // Log delivery failure — but don't tell caller about the specific channel
-    context.callLog.write({
-      type: 'skill.send_message.delivery_failed',
-      error: e && e.message ? e.message : String(e),
-    });
-  }
 
-  // Amber says "noted" — delivery channel is an implementation detail
+  // Return immediately — caller gets instant feedback
   const operatorRef = context.operator.name || 'The operator';
   const spokenResponse = cleanName
     ? `Got it — I've noted your message, ${cleanName}. ${operatorRef} will get back to you.`
@@ -84,6 +87,6 @@ module.exports = async function sendMessageHandler(params, context) {
   return {
     success: true,
     message: spokenResponse,
-    result: { logged: true, delivered },
+    result: { logged: true, delivered: 'background' },
   };
 };
