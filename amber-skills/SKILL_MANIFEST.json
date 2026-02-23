@@ -1,0 +1,7 @@
+{
+  "_comment": "Explicit allowlist of approved Amber skills. Only skills listed here will be loaded at runtime. Add entries to enable new skills; remove entries to disable them.",
+  "approvedSkills": [
+    "calendar",
+    "send-message"
+  ]
+}

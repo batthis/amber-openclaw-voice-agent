@@ -87,7 +87,32 @@ function validateManifest(data: Record<string, any>, skillDir: string): AmberSki
 }
 
 /**
+ * Load the approved skill list from SKILL_MANIFEST.json.
+ * Only skills explicitly listed in approvedSkills will be loaded.
+ * This provides an explicit allowlist so the runtime never loads
+ * unexpected or unreviewed handler.js files.
+ */
+function loadApprovedSkills(skillsDir: string): Set<string> {
+  const manifestPath = path.join(skillsDir, 'SKILL_MANIFEST.json');
+  if (!fs.existsSync(manifestPath)) {
+    console.warn('[skills] No SKILL_MANIFEST.json found — no skills will be loaded');
+    return new Set();
+  }
+  try {
+    const raw = fs.readFileSync(manifestPath, 'utf8');
+    const data = JSON.parse(raw);
+    const approved: string[] = Array.isArray(data.approvedSkills) ? data.approvedSkills : [];
+    console.log(`[skills] Approved skill allowlist: [${approved.join(', ')}]`);
+    return new Set(approved);
+  } catch (e) {
+    console.error('[skills] Failed to parse SKILL_MANIFEST.json — no skills loaded:', e);
+    return new Set();
+  }
+}
+
+/**
  * Load all skills from the amber-skills/ directory.
+ * Only skills listed in amber-skills/SKILL_MANIFEST.json are loaded.
  * Returns array of loaded skills ready for registration.
  */
 export function loadSkills(skillsDir: string): LoadedSkill[] {
@@ -98,10 +123,20 @@ export function loadSkills(skillsDir: string): LoadedSkill[] {
     return loaded;
   }
 
+  // Enforce allowlist — only load skills explicitly approved in SKILL_MANIFEST.json
+  const approvedSkills = loadApprovedSkills(skillsDir);
+  if (approvedSkills.size === 0) return loaded;
+
   const entries = fs.readdirSync(skillsDir, { withFileTypes: true });
 
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
+
+    // Skip any skill not in the approved allowlist
+    if (!approvedSkills.has(entry.name)) {
+      console.log(`[skills] Skipping ${entry.name}: not in SKILL_MANIFEST.json allowlist`);
+      continue;
+    }
 
     const skillDir = path.join(skillsDir, entry.name);
     const skillMd = path.join(skillDir, 'SKILL.md');
@@ -125,7 +160,7 @@ export function loadSkills(skillsDir: string): LoadedSkill[] {
 
       if (!manifest) continue;
 
-      // Load handler
+      // Load handler — only reaches here if skill is in the approved allowlist
       // eslint-disable-next-line @typescript-eslint/no-var-requires
       const handler: SkillHandler = require(handlerJs);
 
