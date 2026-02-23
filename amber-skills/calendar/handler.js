@@ -63,25 +63,72 @@ function formatAvailability(slots, range) {
   return lines.join('\n');
 }
 
+// ---------------------------------------------------------------------------
+// Input validation helpers
+// ---------------------------------------------------------------------------
+
+/** Allowed keyword ranges */
+const RANGE_KEYWORDS = new Set(['today', 'tomorrow', 'week']);
+
+/** Strict ISO date: YYYY-MM-DD only */
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Strict ISO datetime: YYYY-MM-DDTHH:MM (no seconds, no timezone injection) */
+const DATETIME_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
+
+/** Safe freetext: printable ASCII/Unicode, no control chars, max 200 chars */
+function safeFreeText(val, maxLen = 200) {
+  if (typeof val !== 'string') return null;
+  // Strip control characters (0x00–0x1F, 0x7F)
+  const cleaned = val.replace(/[\x00-\x1f\x7f]/g, '').slice(0, maxLen);
+  return cleaned || null;
+}
+
+function validateRange(r) {
+  if (RANGE_KEYWORDS.has(r)) return true;
+  if (DATE_RE.test(r)) return true;
+  return false;
+}
+
+function validateDatetime(dt) {
+  return DATETIME_RE.test(dt);
+}
+
+// ---------------------------------------------------------------------------
+
 module.exports = async function calendarHandler(params, context) {
   const { action, range, title, start, end, calendar, notes, location } = params;
 
   try {
     if (action === 'lookup') {
-      const r = range || 'today';
+      const r = (range || 'today').trim();
 
-      let cmd;
-      if (r === 'today' || r === 'tomorrow' || r === 'week') {
-        cmd = `/usr/local/bin/ical-query ${r}`;
+      // SECURITY: Strict validation before the value reaches any exec call
+      if (!validateRange(r)) {
+        return {
+          success: false,
+          error: 'Invalid range value',
+          message: "Please specify today, tomorrow, week, or a date like 2026-02-23.",
+        };
+      }
+
+      // Build args array — execFileSync, no shell interpretation
+      let args;
+      if (RANGE_KEYWORDS.has(r)) {
+        args = ['/usr/local/bin/ical-query', r];
       } else {
-        cmd = `/usr/local/bin/ical-query range ${r} ${r}`;
+        // Specific date: `ical-query range YYYY-MM-DD YYYY-MM-DD`
+        args = ['/usr/local/bin/ical-query', 'range', r, r];
       }
 
       if (calendar) {
-        cmd += ` --calendar "${calendar.replace(/"/g, '\\"')}"`;
+        const safeCalendar = safeFreeText(calendar, 100);
+        if (safeCalendar) {
+          args.push('--calendar', safeCalendar);
+        }
       }
 
-      const output = await context.exec(cmd);
+      const output = await context.exec(args);
 
       if (!output || !output.trim()) {
         return {
@@ -112,20 +159,45 @@ module.exports = async function calendarHandler(params, context) {
         };
       }
 
-      const safeTitle = title.replace(/"/g, '\\"');
-      const safeStart = start.replace(/"/g, '\\"');
-      const safeEnd = end.replace(/"/g, '\\"');
+      // SECURITY: Validate datetime formats strictly
+      if (!validateDatetime(start) || !validateDatetime(end)) {
+        return {
+          success: false,
+          error: 'Invalid start or end datetime format',
+          message: "Please provide start and end times in the format 2026-02-23T15:00.",
+        };
+      }
 
-      let cmd = `/usr/local/bin/ical-query add "${safeTitle}" "${safeStart}" "${safeEnd}"`;
-      if (calendar) cmd += ` --calendar "${calendar.replace(/"/g, '\\"')}"`;
-      if (location) cmd += ` --location "${location.replace(/"/g, '\\"')}"`;
-      if (notes) cmd += ` --notes "${notes.replace(/"/g, '\\"')}"`;
+      const safeTitle = safeFreeText(title, 200);
+      if (!safeTitle) {
+        return {
+          success: false,
+          error: 'Invalid or empty title',
+          message: "I need a valid title to create an event.",
+        };
+      }
 
-      const output = await context.exec(cmd);
+      // Build args array — no shell, no injection
+      const args = ['/usr/local/bin/ical-query', 'add', safeTitle, start, end];
+      if (calendar) {
+        const safeCalendar = safeFreeText(calendar, 100);
+        if (safeCalendar) args.push('--calendar', safeCalendar);
+      }
+      if (location) {
+        const safeLocation = safeFreeText(location, 200);
+        if (safeLocation) args.push('--location', safeLocation);
+      }
+      if (notes) {
+        const safeNotes = safeFreeText(notes, 500);
+        if (safeNotes) args.push('--notes', safeNotes);
+      }
+
+      const output = await context.exec(args);
 
       context.callLog.write({
         type: 'skill.calendar.create',
-        title, start, end,
+        title: safeTitle,
+        start, end,
         calendar: calendar || 'default',
         location: location || null,
         notes: notes || null,

@@ -5,7 +5,7 @@
  * enforced based on the skill's manifest.
  */
 
-import { execSync } from 'child_process';
+import { execSync, execFileSync } from 'child_process';
 import { AmberSkillPermissions, SkillCallContext } from './types.js';
 import OpenAI from 'openai';
 
@@ -39,10 +39,18 @@ export function buildSkillContext(
   return {
     /**
      * Execute a local binary. Only binaries listed in permissions.local_binaries are allowed.
+     *
+     * Preferred: pass cmd as a string[] (e.g. ['/usr/local/bin/ical-query', 'today'])
+     * to use execFileSync — no shell interpretation, immune to command injection.
+     *
+     * Legacy: passing a plain string falls back to execSync (shell string), but
+     * callers should migrate to array form to eliminate injection risk.
      */
-    exec: async (cmd: string): Promise<string> => {
-      // Extract the binary name from the command
-      const bin = cmd.trim().split(/\s+/)[0];
+    exec: async (cmd: string | string[]): Promise<string> => {
+      const isArray = Array.isArray(cmd);
+
+      // Extract the binary name for permission check
+      const bin = isArray ? (cmd as string[])[0] : (cmd as string).trim().split(/\s+/)[0];
       const baseBin = bin.split('/').pop() || bin;
 
       if (!allowedBins.has(baseBin) && !allowedBins.has(bin)) {
@@ -50,7 +58,12 @@ export function buildSkillContext(
       }
 
       try {
-        return execSync(cmd, { encoding: 'utf8', timeout: 10000 }).trim();
+        if (isArray) {
+          const [file, ...args] = cmd as string[];
+          return execFileSync(file, args, { encoding: 'utf8', timeout: 10000 }).trim();
+        } else {
+          return execSync(cmd as string, { encoding: 'utf8', timeout: 10000 }).trim();
+        }
       } catch (e: any) {
         throw new Error(`exec failed: ${e.message || e}`);
       }
