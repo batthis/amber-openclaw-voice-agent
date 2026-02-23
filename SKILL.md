@@ -10,7 +10,7 @@ metadata: {"openclaw":{"emoji":"☎️","requires":{"env":["TWILIO_ACCOUNT_SID",
 
 ## Overview
 
-Amber gives any OpenClaw deployment a phone-capable voice assistant. It ships with a **production-ready Twilio + OpenAI Realtime bridge** (`runtime/`) that handles inbound call screening, outbound calls, appointment booking, and live OpenClaw knowledge lookups — all via natural voice conversation.
+Amber gives any OpenClaw deployment a phone-capable AI voice assistant. It ships with a **production-ready Twilio + OpenAI Realtime bridge** (`runtime/`) that handles inbound call screening, outbound calls, appointment booking, and live OpenClaw knowledge lookups — all via natural voice conversation.
 
 **✨ New:** Interactive setup wizard (`npm run setup`) validates credentials in real-time and generates a working `.env` file — no manual configuration needed!
 
