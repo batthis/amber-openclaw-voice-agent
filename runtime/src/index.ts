@@ -671,12 +671,8 @@ const callAccept = {
       model: 'gpt-realtime',
       tools: getAllTools(),
       tool_choice: 'auto',
-      turn_detection: {
-        type: 'server_vad',
-        threshold: 0.99,            // Max: require loud/clear speech (default 0.5 is too noise-sensitive)
-        prefix_padding_ms: 500,     // Reduced from 1200ms — less noise captured before speech
-        silence_duration_ms: 800,   // Faster turn detection for natural conversation
-      },
+      // NOTE: turn_detection is NOT supported in callAccept — only in session.update
+      // VAD settings are applied via session.update after WebSocket connects
       audio: {
         output: { voice: OPENAI_VOICE },
         // Enable caller-side transcription (no `enabled` flag; schema expects a model)
