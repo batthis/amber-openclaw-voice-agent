@@ -32,8 +32,8 @@ export interface AmberSkillManifest {
 }
 
 export interface SkillCallContext {
-  /** Preferred: pass string[] for execFileSync (no shell, no injection risk). String form is legacy. */
-  exec: (cmd: string | string[]) => Promise<string>;
+  /** Must be string[] — uses execFileSync (no shell spawned, no injection risk). */
+  exec: (cmd: string[]) => Promise<string>;
   callLog: {
     write: (entry: Record<string, any>) => void;
   };

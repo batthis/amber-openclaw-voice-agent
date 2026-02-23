@@ -5,7 +5,7 @@
  * enforced based on the skill's manifest.
  */
 
-import { execSync, execFileSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import { AmberSkillPermissions, SkillCallContext } from './types.js';
 import OpenAI from 'openai';
 
@@ -40,30 +40,24 @@ export function buildSkillContext(
     /**
      * Execute a local binary. Only binaries listed in permissions.local_binaries are allowed.
      *
-     * Preferred: pass cmd as a string[] (e.g. ['/usr/local/bin/ical-query', 'today'])
-     * to use execFileSync — no shell interpretation, immune to command injection.
-     *
-     * Legacy: passing a plain string falls back to execSync (shell string), but
-     * callers should migrate to array form to eliminate injection risk.
+     * cmd must be a string[] — e.g. ['/usr/local/bin/ical-query', 'today'].
+     * Uses execFileSync: no shell is spawned, arguments are passed as discrete tokens,
+     * immune to shell injection regardless of argument content.
      */
-    exec: async (cmd: string | string[]): Promise<string> => {
-      const isArray = Array.isArray(cmd);
+    exec: async (cmd: string[]): Promise<string> => {
+      if (!Array.isArray(cmd) || cmd.length === 0) {
+        throw new Error('exec requires a non-empty string[] — shell string commands are not supported');
+      }
 
-      // Extract the binary name for permission check
-      const bin = isArray ? (cmd as string[])[0] : (cmd as string).trim().split(/\s+/)[0];
-      const baseBin = bin.split('/').pop() || bin;
+      const [file, ...args] = cmd;
+      const baseBin = file.split('/').pop() || file;
 
-      if (!allowedBins.has(baseBin) && !allowedBins.has(bin)) {
+      if (!allowedBins.has(baseBin) && !allowedBins.has(file)) {
         throw new Error(`Permission denied: binary "${baseBin}" not in allowed list [${[...allowedBins].join(', ')}]`);
       }
 
       try {
-        if (isArray) {
-          const [file, ...args] = cmd as string[];
-          return execFileSync(file, args, { encoding: 'utf8', timeout: 10000 }).trim();
-        } else {
-          return execSync(cmd as string, { encoding: 'utf8', timeout: 10000 }).trim();
-        }
+        return execFileSync(file, args, { encoding: 'utf8', timeout: 10000 }).trim();
       } catch (e: any) {
         throw new Error(`exec failed: ${e.message || e}`);
       }
