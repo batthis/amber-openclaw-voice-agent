@@ -151,8 +151,24 @@ interface AgentSections {
 }
 
 function loadAgentMd(): AgentSections | null {
-  const agentPath = process.env.AGENT_MD_PATH
-    || path.join(process.cwd(), '..', 'AGENT.md');
+  const defaultAgentPath = path.join(process.cwd(), '..', 'AGENT.md');
+
+  // Validate AGENT_MD_PATH to prevent path traversal / prompt injection via env var.
+  // The env var is operator-configured, but we still enforce basic constraints:
+  //   1. Resolve to absolute path (eliminates traversal via relative segments)
+  //   2. Must end in .md (prevents loading arbitrary system files as prompts)
+  //   3. Must not contain null bytes (defence against null-byte injection)
+  // Falls back to the default AGENT.md if validation fails.
+  let agentPath = defaultAgentPath;
+  const envPath = process.env.AGENT_MD_PATH;
+  if (envPath) {
+    const resolved = path.resolve(envPath);
+    if (resolved.includes('\0') || !resolved.endsWith('.md')) {
+      console.error(`[AGENT.md] AGENT_MD_PATH rejected (must be a .md file path): ${envPath} — using default`);
+    } else {
+      agentPath = resolved;
+    }
+  }
   try {
     const raw = fs.readFileSync(agentPath, 'utf-8');
     const calendarRef = DEFAULT_CALENDAR ? `the ${DEFAULT_CALENDAR} calendar` : 'the calendar';
