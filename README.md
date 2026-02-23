@@ -66,6 +66,8 @@ Amber's skill system is designed to grow. Each skill is a self-contained directo
 
 See [`amber-skills/`](amber-skills/) for examples and the full specification to get started.
 
+> ⚠️ **Trust model:** Skill handlers are arbitrary JavaScript executed in the same Node.js process as the runtime. The `permissions` system is a policy layer — it prevents accidental misuse through the constrained API, but it is **not a sandbox**. Only run skills from sources you trust. Review `handler.js` before installing any third-party skill.
+
 ---
 
 ## What's Included
