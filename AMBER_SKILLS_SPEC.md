@@ -139,7 +139,7 @@ export interface AmberSkillManifest {
 }
 
 export interface SkillContext {
-  exec: (cmd: string) => Promise<string>;
+  exec: (cmd: string[]) => Promise<string>;
   callLog: {
     write: (entry: Record<string, any>) => void;
   };
@@ -200,13 +200,13 @@ export interface LoadedSkill {
   8. Never crash — always catch and return gracefully
 
 **Note on confirmation flow:**
-The confirmation is tricky with OpenAI Realtime. The simplest approach for V1:
-- Set `confirmation_required: true` in the manifest
-- Add the confirmation requirement to the function description itself so OpenAI's model
-  asks for confirmation BEFORE triggering the function call
-- Example: "Leave a message for the operator. IMPORTANT: Always confirm with the caller
-  before calling this function. Ask 'Would you like me to leave that message?' and only
-  call this function after they confirm."
+Confirmation for `act` skills is enforced programmatically at the router level — not left to LLM prompting.
+The router rejects any `act` skill call where `confirmed !== true` unless the skill explicitly sets
+`confirmation_required: false` in its manifest (reserved for non-destructive actions only).
+- Set `confirmation_required: true` (or omit it — true is the default) for any action with side effects
+- Include `confirmed` as a required boolean parameter in `function_schema.parameters`
+- The function description should also prompt the model to confirm with the caller first, as an
+  additional layer — but the router enforcement is the authoritative gate, not the model prompt
 - This puts confirmation in the LLM layer, not the router layer (simpler, reliable enough for V1)
 
 ### 4. api.ts
@@ -268,17 +268,16 @@ Query and manage the operator's calendar via `ical-query` CLI.
 
 ### handler.js
 ```js
-const { execSync } = require('child_process');
-
 module.exports = async function(params, context) {
   const { action, range, title, start, end, calendar, notes, location } = params;
   
   try {
     if (action === 'lookup') {
       const r = range || 'today';
-      let cmd = `/usr/local/bin/ical-query ${r}`;
-      if (calendar) cmd += ` --calendar "${calendar}"`;
-      const output = context.exec ? await context.exec(cmd) : execSync(cmd, { encoding: 'utf8', timeout: 4000 });
+      // SECURITY: Use string[] — execFileSync with discrete args, no shell interpolation
+      const args = ['/usr/local/bin/ical-query', r];
+      if (calendar) { args.push('--calendar'); args.push(calendar); }
+      const output = await context.exec(args);
       
       if (!output || !output.trim()) {
         return { success: true, message: `No events found for ${r}.`, result: { events: [] } };
@@ -290,11 +289,12 @@ module.exports = async function(params, context) {
       if (!title || !start || !end) {
         return { success: false, error: 'Missing required fields: title, start, end', message: "I need a title, start time, and end time to create an event." };
       }
-      let cmd = `/usr/local/bin/ical-query add "${title}" "${start}" "${end}"`;
-      if (calendar) cmd += ` --calendar "${calendar}"`;
-      if (location) cmd += ` --location "${location}"`;
-      if (notes) cmd += ` --notes "${notes}"`;
-      const output = context.exec ? await context.exec(cmd) : execSync(cmd, { encoding: 'utf8', timeout: 4000 });
+      // SECURITY: Use string[] — execFileSync with discrete args, no shell interpolation
+      const args = ['/usr/local/bin/ical-query', 'add', title, start, end];
+      if (calendar) { args.push('--calendar'); args.push(calendar); }
+      if (location) { args.push('--location'); args.push(location); }
+      if (notes) { args.push('--notes'); args.push(notes); }
+      const output = await context.exec(args);
       
       context.callLog.write({
         type: 'skill.calendar.create',
