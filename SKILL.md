@@ -1,16 +1,12 @@
 ---
 name: amber-voice-assistant
 title: "Amber — Phone-Capable Voice Agent"
-description: "AI phone & voice agent for OpenClaw. Answer inbound phone calls, screen callers, book appointments, and make outbound phone calls via voice — powered by Twilio + OpenAI Realtime. Includes phone call transcripts, voice conversations, and call scheduling."
+description: "The most complete phone skill for OpenClaw. Production-ready, low-latency AI calls — inbound & outbound, multilingual, live dashboard, brain-in-the-loop."
 homepage: https://github.com/batthis/amber-openclaw-voice-agent
 metadata: {"openclaw":{"emoji":"☎️","requires":{"env":["TWILIO_ACCOUNT_SID","TWILIO_AUTH_TOKEN","TWILIO_CALLER_ID","OPENAI_API_KEY","OPENAI_PROJECT_ID","OPENAI_WEBHOOK_SECRET","PUBLIC_BASE_URL"],"optionalEnv":["OPENCLAW_GATEWAY_URL","OPENCLAW_GATEWAY_TOKEN","BRIDGE_API_TOKEN","TWILIO_WEBHOOK_STRICT","VOICE_PROVIDER","VOICE_WEBHOOK_SECRET"],"anyBins":["node","ical-query","bash"]},"primaryEnv":"OPENAI_API_KEY","install":[{"id":"runtime","kind":"node","cwd":"runtime","label":"Install Amber runtime (cd runtime && npm install && npm run build)"}]}}
 ---
 
 # Amber — Phone-Capable Voice Agent
-
-**Phone calls · Voice agent · Inbound call screening · Outbound calling · Voice AI · Call transcripts · Twilio · OpenAI Realtime**
-
-Amber is a phone and voice AI agent for OpenClaw. It handles inbound phone calls, screens callers by voice, books appointments during live phone conversations, and places outbound phone calls — all with low-latency voice using Twilio and OpenAI Realtime.
 
 ## Overview
 
