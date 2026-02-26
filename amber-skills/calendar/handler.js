@@ -217,9 +217,14 @@ module.exports = async function calendarHandler(params, context) {
     };
 
   } catch (e) {
+    const errMsg = e && e.message ? e.message : String(e);
+    // Log the actual error so it shows up in the call JSONL
+    try {
+      context.callLog.write({ type: 'skill.calendar.error', error: errMsg });
+    } catch (_) {}
     return {
       success: false,
-      error: e && e.message ? e.message : String(e),
+      error: errMsg,
       message: "I had trouble accessing the calendar. Let me note that for follow-up.",
     };
   }

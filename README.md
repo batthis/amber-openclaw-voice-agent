@@ -32,6 +32,34 @@ Point your Twilio voice webhook to `https://<your-domain>/twilio/inbound` — do
 
 > **Switching providers?** Set `VOICE_PROVIDER=telnyx` (or another supported provider) in your `.env` — no code changes needed. See [SKILL.md](SKILL.md) for details.
 
+## ♻️ Runtime Management — Staying Current After Recompilation
+
+**Important:** Amber's runtime is a long-running Node.js process. It loads `dist/` once at startup. If you recompile (e.g. after a `git pull` and `npm run build`), **the running process will not pick up the changes automatically** — you must restart it.
+
+```bash
+# macOS LaunchAgent (recommended)
+launchctl kickstart -k gui/$(id -u)/com.jarvis.twilio-bridge
+
+# or manual restart
+kill $(pgrep -f 'dist/index.js') && sleep 2 && node dist/index.js
+```
+
+### Automatic Restart (Recommended for Persistent Deployments)
+
+Amber includes a `dist-watcher` script that runs in the background and automatically restarts the runtime whenever `dist/` files are newer than the running process. This prevents the "stale runtime" problem entirely.
+
+To enable it, register the provided LaunchAgent:
+
+```bash
+cp runtime/scripts/com.jarvis.amber-dist-watcher.plist.example ~/Library/LaunchAgents/com.jarvis.amber-dist-watcher.plist
+# Edit the plist to match your username/paths
+launchctl load ~/Library/LaunchAgents/com.jarvis.amber-dist-watcher.plist
+```
+
+The watcher checks every 60 seconds and logs to `/tmp/amber-dist-watcher.log`.
+
+> **Why this matters:** Skills and the router are loaded fresh at startup. A mismatch between a compiled `dist/skills/` and a hand-edited `handler.js` (or vice versa) will cause silent skill failures that are hard to diagnose. Always restart after any `npm run build`.
+
 ## 🔌 Amber Skills — Extensible by Design
 
 Amber ships with a growing library of **Amber Skills** — modular capabilities that plug directly into live voice conversations. Each skill exposes a structured function that Amber can call mid-call, letting you compose powerful voice workflows without touching the bridge code.
