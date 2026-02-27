@@ -95,6 +95,32 @@ function validateDatetime(dt) {
 }
 
 // ---------------------------------------------------------------------------
+// Binary path allowlist — only these absolute paths may be exec'd
+// ---------------------------------------------------------------------------
+const ALLOWED_BINARIES = new Set(['/usr/local/bin/ical-query']);
+
+// Verify the binary exists at module load time (fail-fast, not at call time)
+const fs_sync = require('fs');
+for (const binPath of ALLOWED_BINARIES) {
+  try {
+    fs_sync.accessSync(binPath, fs_sync.constants.X_OK);
+  } catch (_) {
+    // Log but don't throw — binary may not be installed in all environments
+    console.warn(`[calendar/handler] WARNING: required binary not found or not executable: ${binPath}`);
+  }
+}
+
+/**
+ * Validate that a command array's first element is an allowed binary path.
+ * Throws if the binary is not on the allowlist.
+ */
+function assertAllowedBinary(args) {
+  if (!Array.isArray(args) || !ALLOWED_BINARIES.has(args[0])) {
+    throw new Error(`Security: attempted exec of non-allowlisted binary: ${args && args[0]}`);
+  }
+}
+
+// ---------------------------------------------------------------------------
 
 module.exports = async function calendarHandler(params, context) {
   const { action, range, title, start, end, calendar, notes, location } = params;
@@ -128,6 +154,7 @@ module.exports = async function calendarHandler(params, context) {
         }
       }
 
+      assertAllowedBinary(args);
       const output = await context.exec(args);
 
       if (!output || !output.trim()) {
@@ -192,6 +219,7 @@ module.exports = async function calendarHandler(params, context) {
         if (safeNotes) args.push('--notes', safeNotes);
       }
 
+      assertAllowedBinary(args);
       const output = await context.exec(args);
 
       context.callLog.write({
