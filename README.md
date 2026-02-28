@@ -23,6 +23,14 @@ Amber is not a standalone voice agent — it operates as an extension of your Op
 
 ## 🆕 What's New
 
+### v5.3.1 — Security Scope Hardening (Feb 2026)
+
+Addressed scanner feedback around instruction scope and credential handling:
+
+- Tightened `ask_openclaw` usage rules to **call-critical, least-privilege actions only**
+- Clarified credential hygiene guidance (dedicated Twilio/OpenAI credentials, minimal gateway token scope)
+- Added setup-wizard preflight warnings for native build requirements (`better-sqlite3`) to reduce insecure/failed installs
+
 ### v5.3.0 — CRM Skill (Feb 2026)
 
 Amber now has memory. Every call — inbound or outbound — is automatically logged to a local SQLite contact database. Callers are greeted by name. Personal context (pet names, recent events, preferences) is captured post-call by an LLM extraction pass and used to personalize future conversations. No configuration required — it works out of the box.

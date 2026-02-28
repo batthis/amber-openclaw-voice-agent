@@ -92,7 +92,7 @@ cd dashboard && node scripts/serve.js   # → http://localhost:8787
 - **Ship a voice assistant in minutes** — `npm install`, configure `.env`, `npm start`
 - Full inbound screening: greeting, message-taking, appointment booking with calendar integration
 - Outbound calls with structured call plans (reservations, inquiries, follow-ups)
-- **`ask_openclaw` tool** — voice agent consults your OpenClaw gateway mid-call for calendar, contacts, preferences
+- **`ask_openclaw` tool (least-privilege)** — voice agent consults your OpenClaw gateway only for call-critical needs (calendar checks, booking, required factual lookups), not for unrelated tasks
 - VAD tuning + verbal fillers to keep conversations natural (no dead air during lookups)
 - Fully configurable: assistant name, operator info, org name, calendar, screening style — all via env vars
 - Operator safety guardrails for approvals/escalation/payment handling
@@ -148,6 +148,17 @@ The easiest way to get started:
 4. If preflight passes, run one inbound and one outbound smoke test.
 5. Only then move to production usage.
 
+## Credential scope (recommended hardening)
+
+Use least-privilege credentials for every provider:
+
+- **Twilio:** use a dedicated subaccount for Amber and rotate auth tokens regularly.
+- **OpenAI:** use a dedicated project API key for this runtime only; avoid reusing keys from unrelated apps.
+- **OpenClaw Gateway token:** only set `OPENCLAW_GATEWAY_TOKEN` if you need brain-in-the-loop lookups; keep token scope minimal.
+- **Secrets in logs:** never print full credentials in scripts, setup output, or call transcripts.
+
+These controls reduce blast radius if a host or config file is exposed.
+
 ## Safe defaults
 
 - Require explicit approval before outbound calls.
@@ -194,6 +205,13 @@ The easiest way to get started:
 - Never publish secrets, tokens, phone numbers, webhook URLs with credentials, or personal data.
 - Include explicit safety rules for outbound calls, payments, and escalation.
 - Mark V1 as beta if conversational quality/latency tuning is ongoing.
+
+## Install safety notes
+
+- Amber does **not** execute arbitrary install-time scripts from this repository.
+- Runtime install uses standard Node dependency installation in `runtime/`.
+- CRM uses `better-sqlite3` (native module), which compiles locally on your machine.
+- Review `runtime/package.json` dependencies before deployment in regulated environments.
 
 ## Resources
 
