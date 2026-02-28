@@ -315,6 +315,33 @@ ${c.bold}${c.cyan}╔═══════════════════�
   head('Post-Setup');
 
   if (await yesNo('Run npm install?')) {
+    // Check for native build tools — better-sqlite3 (CRM skill) requires compilation.
+    // On macOS this means Xcode CLI tools + accepted license. Warn early so the user
+    // knows what to do if npm install fails with a gyp/make error.
+    const platform = process.platform;
+    if (platform === 'darwin') {
+      try {
+        execSync('xcode-select -p', { stdio: 'pipe' });
+        // Xcode tools present — check license accepted
+        try {
+          execSync('xcodebuild -license check', { stdio: 'pipe' });
+        } catch (_) {
+          warn('Xcode license not accepted. The CRM skill (better-sqlite3) requires native compilation.');
+          warn('If npm install fails, run: sudo xcodebuild -license accept');
+        }
+      } catch (_) {
+        warn('Xcode Command Line Tools not found. The CRM skill (better-sqlite3) requires native compilation.');
+        warn('Install them first: xcode-select --install');
+      }
+    } else if (platform === 'linux') {
+      try {
+        execSync('which make && which python3', { stdio: 'pipe' });
+      } catch (_) {
+        warn('build-essential or python3 may be missing. The CRM skill requires native compilation.');
+        warn('On Debian/Ubuntu: sudo apt install build-essential python3');
+      }
+    }
+
     const s = spinner('Installing dependencies…');
     try {
       // Security: hardcoded npm command, cwd scoped to this script's own directory
@@ -322,6 +349,9 @@ ${c.bold}${c.cyan}╔═══════════════════�
       s.stop(); ok('Dependencies installed');
     } catch (e) {
       s.stop(); fail(`npm install failed: ${e.message}`);
+      if (platform === 'darwin') {
+        info('If the error mentions gyp or make, run: sudo xcodebuild -license accept  then retry npm install.');
+      }
     }
   }
 

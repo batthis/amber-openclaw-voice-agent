@@ -25,7 +25,8 @@ Amber gives any OpenClaw deployment a phone-capable AI voice assistant. It ships
 ### What's included
 
 - **Runtime bridge** (`runtime/`) — a complete Node.js server that connects Twilio phone calls to OpenAI Realtime with OpenClaw brain-in-the-loop
-- **Amber Skills** (`amber-skills/`) — modular mid-call capabilities (calendar, log & forward message) with a spec for building your own
+- **Amber Skills** (`amber-skills/`) — modular mid-call capabilities (CRM, calendar, log & forward message) with a spec for building your own
+- **Built-in CRM** — local SQLite contact database; Amber greets callers by name and references personal context naturally on every call
 - **Call log dashboard** (`dashboard/`) — browse call history, transcripts, and captured messages; includes **manual Sync button** to pull new calls on demand
 - **Setup & validation scripts** — preflight checks, env templates, quickstart runner
 - **Architecture docs & troubleshooting** — call flow diagrams, common failure runbooks
@@ -34,6 +35,17 @@ Amber gives any OpenClaw deployment a phone-capable AI voice assistant. It ships
 ## 🔌 Amber Skills — Extensible by Design
 
 Amber ships with a growing library of **Amber Skills** — modular capabilities that plug directly into live voice conversations. Each skill exposes a structured function that Amber can call mid-call, letting you compose powerful voice workflows without touching the bridge code.
+
+### 🧑‍💼 CRM — Contact Memory *(v5.3.0)*
+
+Amber remembers every caller across calls and uses that memory to personalize every conversation.
+
+- **Runtime-managed** — lookup and logging happen automatically; Amber never has to "remember" to call CRM
+- **Personalized greeting** — known callers are greeted by name; personal context (pets, recent events, preferences) is referenced warmly on the first sentence
+- **Two-pass enrichment** — auto-log captures the call immediately; a post-call LLM extraction pass reads the full transcript to extract name, email, and `context_notes`
+- **Symmetric** — works identically for inbound and outbound calls
+- **Local SQLite** — stored at `~/.config/amber/crm.sqlite`; no cloud, no data leaves your machine
+- **Native dependency** — requires `better-sqlite3` (native build). macOS: `sudo xcodebuild -license accept` before `npm install`. Linux: `build-essential` + `python3`.
 
 ### 📅 Calendar
 
