@@ -6,12 +6,11 @@ const { URL } = require('url');
 const { spawn } = require('child_process');
 
 function parseArgs(argv) {
-  const args = { port: 8787, host: '127.0.0.1', allowNonLoopback: false };
+  const args = { port: 8787, host: '127.0.0.1' };
   for (let i = 2; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--port' && argv[i + 1]) args.port = Number(argv[++i]);
     else if (a === '--host' && argv[i + 1]) args.host = argv[++i];
-    else if (a === '--allow-non-loopback') args.allowNonLoopback = true;
     else if (a === '-h' || a === '--help') args.help = true;
   }
   return args;
@@ -30,10 +29,10 @@ function contentType(p) {
 
 const args = parseArgs(process.argv);
 if (args.help) {
-  console.log('Usage: node scripts/serve.js [--host 127.0.0.1] [--port 8787] [--allow-non-loopback]');
+  console.log('Usage: node scripts/serve.js [--host 127.0.0.1] [--port 8787]');
   console.log('');
-  console.log('  --allow-non-loopback  Required to bind to a non-loopback address.');
-  console.log('                        WARNING: Exposes call logs to the network.');
+  console.log('  The dashboard binds to loopback only (127.0.0.1/::1/localhost).');
+  console.log('  For remote access, use a reverse proxy with authentication.');
   process.exit(0);
 }
 
@@ -111,22 +110,18 @@ const server = http.createServer((req, res) => {
   });
 });
 
-// Reject non-loopback binding unless explicitly opted in (exposes call logs to the network)
+// Hard-reject non-loopback binding — no override flag exists.
+// Call logs and transcripts contain PII; exposing them without authentication is not permitted.
+// For remote access, place a reverse proxy with authentication in front of this server.
 const LOOPBACK_ADDRESSES = new Set(['127.0.0.1', '::1', 'localhost']);
 if (!LOOPBACK_ADDRESSES.has(args.host)) {
-  if (!args.allowNonLoopback) {
-    console.error('');
-    console.error('ERROR: Dashboard refuses to bind to a non-loopback address (' + args.host + ').');
-    console.error('   This would expose call logs and transcripts to the network without authentication.');
-    console.error('   Pass --allow-non-loopback to explicitly override this safety check.');
-    console.error('');
-    process.exit(1);
-  }
-  console.warn('');
-  console.warn('⚠️  WARNING: Dashboard is binding to a non-loopback address (' + args.host + ').');
-  console.warn('   Call logs and transcripts are accessible to the network WITHOUT authentication.');
-  console.warn('   Ensure you have a firewall or reverse proxy with auth in front of this server.');
-  console.warn('');
+  console.error('');
+  console.error('ERROR: Dashboard only binds to loopback (127.0.0.1 / ::1 / localhost).');
+  console.error('   Requested: ' + args.host);
+  console.error('   Call logs and transcripts contain PII and must not be exposed to the network without authentication.');
+  console.error('   For remote access, use a reverse proxy (e.g. nginx, caddy) with authentication.');
+  console.error('');
+  process.exit(1);
 }
 
 server.listen(args.port, args.host, () => {
