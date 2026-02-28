@@ -754,8 +754,11 @@ const callAccept = {
     activeCallSockets.set(callId, ws);
 
     // Caller/callee phone — available to both open and close handlers.
-    // For inbound: caller's number from Twilio. For outbound: the number we dialed.
-    const callerPhone = inbound?.from ?? (bridgeId ? (outboundIntentByKey.get(bridgeId)?.to ?? null) : null);
+    // For outbound: always use the 'to' number we dialed (bridgeId → intent.to).
+    //   inbound?.from on outbound calls is our own Twilio number (SIP leg quirk) — not the callee.
+    // For inbound: use the caller's number from Twilio.
+    const outboundTo = bridgeId ? (outboundIntentByKey.get(bridgeId)?.to ?? null) : null;
+    const callerPhone = outboundTo ?? inbound?.from ?? null;
 
     ws.on('open', () => {
       writeJsonl({ type: 'ws.open', call_id: callId, received_at: new Date().toISOString() });
@@ -800,13 +803,14 @@ const callAccept = {
         let greetingInstruction: string;
 
         if (crmContact?.name) {
-          // Known caller — give Amber the context and let her improvise a personalized greeting.
+          // Known contact — give Amber the context and let her improvise a personalized greeting.
           // Do NOT hardcode the greeting text; let her use the name and context naturally.
           const contextLine = crmContact.context_notes
             ? `Personal context you know about them: ${crmContact.context_notes}`
             : '';
+          const direction = outboundObjective ? 'calling' : 'receiving a call from';
           greetingInstruction = [
-            `[CRM] You know this caller. Their name is ${crmContact.name}.`,
+            `[CRM] You are ${direction} ${crmContact.name}. The person on the line IS ${crmContact.name} — do not refer to them in third person.`,
             contextLine,
             `Greet them warmly by name, like you remember them. Be natural — not robotic.`,
             `If you know something personal (like their dog being sick), you can mention it warmly.`,
