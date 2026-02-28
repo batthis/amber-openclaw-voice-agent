@@ -404,6 +404,7 @@ type OutboundIntent = {
   key: string; // can be twilio CallSid or our bridgeId
   objective: string;
   callPlan?: CallPlan;
+  to?: string; // E.164 number being called — used for CRM lookup on outbound calls
   createdAtMs: number;
 };
 const OUTBOUND_INTENT_RETENTION_MS = 10 * 60 * 1000;
@@ -581,6 +582,7 @@ app.post('/call/outbound', requireAuth, async (req: Request, res: Response) => {
         key: bridgeId,
         objective: objective || callPlanToObjective(callPlan),
         callPlan,
+        to,
         createdAtMs: Date.now()
       });
     }
@@ -751,8 +753,9 @@ const callAccept = {
     // Track this socket so we can reference it later
     activeCallSockets.set(callId, ws);
 
-    // Caller phone available to both open and close handlers
-    const callerPhone = inbound?.from ?? null;
+    // Caller/callee phone — available to both open and close handlers.
+    // For inbound: caller's number from Twilio. For outbound: the number we dialed.
+    const callerPhone = inbound?.from ?? (bridgeId ? (outboundIntentByKey.get(bridgeId)?.to ?? null) : null);
 
     ws.on('open', () => {
       writeJsonl({ type: 'ws.open', call_id: callId, received_at: new Date().toISOString() });
