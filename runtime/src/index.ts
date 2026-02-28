@@ -793,21 +793,30 @@ const callAccept = {
        * CRM lookup is synchronous SQLite (~1ms), so this adds no perceptible delay.
        * Falls back to default greeting if no phone, private number, or CRM error.
        */
-      const sendGreeting = (crmContext?: string) => {
-        // Inject CRM context into session before greeting if we have it
-        if (crmContext) {
-          const crmSessionUpdate = {
-            type: 'session.update',
-            session: {
-              instructions: `[CRM CONTEXT — use naturally, never recite robotically]\n${crmContext}\n\nIMPORTANT: Greet the caller by name in your FIRST sentence. Reference personal context warmly and naturally.`,
-            },
-          };
-          ws.send(JSON.stringify(crmSessionUpdate));
+      const sendGreeting = (crmContact?: { name?: string; context_notes?: string }) => {
+        let greetingInstruction: string;
+
+        if (crmContact?.name) {
+          // Known caller — give Amber the context and let her improvise a personalized greeting.
+          // Do NOT hardcode the greeting text; let her use the name and context naturally.
+          const contextLine = crmContact.context_notes
+            ? `Personal context you know about them: ${crmContact.context_notes}`
+            : '';
+          greetingInstruction = [
+            `[CRM] You know this caller. Their name is ${crmContact.name}.`,
+            contextLine,
+            `Greet them warmly by name, like you remember them. Be natural — not robotic.`,
+            `If you know something personal (like their dog being sick), you can mention it warmly.`,
+            `Keep it short and let them respond.`,
+          ].filter(Boolean).join(' ');
+        } else {
+          // Unknown caller — use the standard greeting
+          greetingInstruction = `Say to the user: ${greeting}`;
         }
 
         const responseCreate = {
           type: 'response.create',
-          response: { instructions: `Say to the user: ${greeting}` }
+          response: { instructions: greetingInstruction }
         } as const;
         ws.send(JSON.stringify(responseCreate));
       };
@@ -830,27 +839,18 @@ const callAccept = {
             if (crmResult.skipped) { sendGreeting(); return; } // private number
 
             const contact = crmResult.result?.contact;
-            const interactions = crmResult.result?.interactions ?? [];
 
             if (!contact) { sendGreeting(); return; } // new caller
 
-            // Build CRM context block
-            const namePart = contact.name ? `Caller's name: ${contact.name}.` : '';
-            const notesPart = contact.context_notes ? `Personal context: ${contact.context_notes}` : '';
-            const historyPart = interactions.length > 0
-              ? `Last call summary: ${interactions[0].summary || '(no summary)'} (${interactions[0].created_at?.slice(0, 10)}).`
-              : '';
-            const crmContext = [namePart, notesPart, historyPart].filter(Boolean).join(' ');
-
-            writeJsonl({ type: 'c2.crm_context_injected', call_id: callId, received_at: new Date().toISOString(), contact_name: contact.name });
-            sendGreeting(crmContext || undefined);
+            writeJsonl({ type: 'c2.crm_context_injected', call_id: callId, received_at: new Date().toISOString(), contact_name: contact.name ?? null });
+            sendGreeting(contact.name ? { name: contact.name, context_notes: contact.context_notes ?? undefined } : undefined);
           })
           .catch((e) => {
             writeJsonl({ type: 'c2.crm_lookup_error', call_id: callId, received_at: new Date().toISOString(), error: String(e) });
             sendGreeting(); // fall back to default greeting on error
           });
       } else {
-        sendGreeting(); // no caller phone (e.g. outbound with no inbound record)
+        sendGreeting(); // no caller phone (e.g. outbound)
       }
 
       // If the caller is silent, send a single gentle follow-up after ~3 seconds.
