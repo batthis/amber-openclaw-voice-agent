@@ -36,7 +36,7 @@ Amber gives any OpenClaw deployment a phone-capable AI voice assistant. It ships
 
 Amber ships with a growing library of **Amber Skills** — modular capabilities that plug directly into live voice conversations. Each skill exposes a structured function that Amber can call mid-call, letting you compose powerful voice workflows without touching the bridge code.
 
-### 🧑‍💼 CRM — Contact Memory *(v5.3.0)*
+### 👤 CRM — Contact Memory *(v5.3.0)*
 
 Amber remembers every caller across calls and uses that memory to personalize every conversation.
 
@@ -156,6 +156,7 @@ Use least-privilege credentials for every provider:
 - **OpenAI:** use a dedicated project API key for this runtime only; avoid reusing keys from unrelated apps.
 - **OpenClaw Gateway token:** only set `OPENCLAW_GATEWAY_TOKEN` if you need brain-in-the-loop lookups; keep token scope minimal.
 - **Secrets in logs:** never print full credentials in scripts, setup output, or call transcripts.
+- **Setup wizard validation scope:** credential checks call only official Twilio/OpenAI API endpoints over HTTPS for auth verification; no arbitrary exfiltration endpoints are used.
 
 These controls reduce blast radius if a host or config file is exposed.
 

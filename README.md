@@ -14,7 +14,7 @@ Amber is not a standalone voice agent — it operates as an extension of your Op
 - 🔉 **Inbound call screening** — greeting, message-taking, appointment booking
 - 📞 **Outbound calls** — reservations, inquiries, follow-ups with structured call plans
 - 🧠 **Brain-in-the-loop** — consults your OpenClaw gateway mid-call for calendar, contacts, preferences
-- 🧑‍💼 **Built-in CRM** — remembers every caller across calls; greets by name, references personal context naturally
+- 👤 **Built-in CRM** — remembers every caller across calls; greets by name, references personal context naturally
 - 📊 **Call log dashboard** — browse history, transcripts, captured messages, follow-up tracking
 - ⚡ **Launch in minutes** — `npm install`, configure `.env`, `npm start`
 - 🔒 **Safety guardrails** — operator approval for outbound calls, payment escalation, consent boundaries
@@ -85,7 +85,7 @@ Amber ships with a growing library of **Amber Skills** — modular capabilities 
 
 Three skills are included out of the box:
 
-### 🧑‍💼 CRM — Contact Memory
+### 👤 CRM — Contact Memory
 
 Amber remembers every caller across calls and uses that memory to make every conversation feel personal.
 
@@ -98,6 +98,8 @@ Amber remembers every caller across calls and uses that memory to make every con
 - **Backfill-ready** — point the post-call extractor at old transcripts to prime the CRM from day one
 
 > **Native dependency:** The CRM skill uses `better-sqlite3`, which requires native compilation. On macOS, run `sudo xcodebuild -license accept` before `npm install` if you haven't already accepted the Xcode license. On Linux, ensure `build-essential` and `python3` are installed.
+>
+> **Credential validation scope:** The setup wizard validates credentials only against official provider endpoints (Twilio API and OpenAI API) over HTTPS. It does not send secrets to arbitrary third-party services and does not print full secrets in console output.
 
 ### 📅 Calendar
 
