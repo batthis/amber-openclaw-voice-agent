@@ -89,7 +89,10 @@ export class TelnyxProvider implements IVoiceProvider {
     _url: string,
     _params: Record<string, string>
   ): boolean {
-    throw new Error('Telnyx provider not yet implemented: validateRequest');
+    // Stub: always reject — prevents any webhook from being accepted until
+    // this provider is fully implemented. Returns false rather than throwing
+    // to avoid unhandled exceptions in the request pipeline.
+    return false;
   }
 
   // ── SIP bridge response ──────────────────────────────────────────────────
