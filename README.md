@@ -93,7 +93,7 @@ Amber remembers every caller across calls and uses that memory to make every con
 - **Personalized greeting** — if the caller is known, Amber opens with their name and naturally references any personal context ("Hey Abe, how's Max doing?")
 - **Invisible capture** — during the call, a post-call LLM extraction pass reads the full transcript and enriches the contact record with name, email, company, and `context_notes` — a short running paragraph of personal details worth remembering
 - **Symmetric** — works identically for inbound and outbound calls; the number dialed on outbound is the CRM key
-- **Local SQLite database** — stored at `~/.config/amber/crm.sqlite` (configurable via `AMBER_CRM_DB_PATH`); no cloud dependency, no data leaves your machine
+- **Local SQLite database** — stored at `~/.config/amber/crm.sqlite` (configurable via `AMBER_CRM_DB_PATH`); no cloud dependency. CRM contact data stays on your machine. Note: voice audio and transcripts are processed by OpenAI Realtime (a cloud service) — see [OpenAI's privacy policy](https://openai.com/policies/privacy-policy).
 - **Private number safe** — anonymous/blocked numbers are silently skipped; no record created
 - **Backfill-ready** — point the post-call extractor at old transcripts to prime the CRM from day one
 

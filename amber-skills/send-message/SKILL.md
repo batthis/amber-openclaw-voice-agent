@@ -22,7 +22,7 @@ Allows callers to leave a message for the operator. This skill implements the
 
 - The recipient is determined by the operator's configuration — never by caller input
 - No parameter in the schema accepts a destination or recipient
-- Confirmation is required before sending (enforced via LLM function description)
+- Confirmation is required before sending (enforced programmatically at the router layer — the router checks `params.confirmed === true` before invoking; LLM prompt guidance is an additional layer, not the sole enforcement)
 - Message content is sanitized (max length, control characters stripped)
 
 ## Delivery Failure Handling
