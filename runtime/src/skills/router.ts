@@ -36,6 +36,24 @@ export function isSkillFunction(fnName: string): boolean {
 }
 
 /**
+ * Call a skill handler directly by function name, bypassing the Realtime API.
+ * Used for automatic runtime-managed calls (CRM lookup at call start, log at call end).
+ * Does NOT enforce confirmation_required — these are internal, not caller-triggered.
+ */
+export async function callSkillDirectly(
+  fnName: string,
+  params: Record<string, any>,
+  apiDeps: ApiDependencies
+): Promise<SkillResult> {
+  const skill = skillRegistry.get(fnName);
+  if (!skill) {
+    return { success: false, message: `Skill not found: ${fnName}` };
+  }
+  const context = buildSkillContext(skill.manifest.amber.permissions, apiDeps);
+  return executeWithTimeout(skill.handler, params, context, skill.manifest.amber.timeout_ms);
+}
+
+/**
  * Get OpenAI-compatible tool definitions for all registered skills.
  * These get merged with OPENCLAW_TOOLS and sent to the Realtime API.
  */

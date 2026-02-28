@@ -54,6 +54,7 @@ export interface SkillCallContext {
 
 export interface SkillResult {
   success: boolean;
+  skipped?: boolean;
   result?: any;
   message?: string;
   error?: string;

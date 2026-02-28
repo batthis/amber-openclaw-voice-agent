@@ -9,7 +9,7 @@ import OpenAI from 'openai';
 import WebSocket from 'ws';
 import { createProvider } from './providers/index.js';
 import type { IVoiceProvider } from './providers/index.js';
-import { loadSkills, registerSkills, isSkillFunction, getSkillTools, handleSkillCall } from './skills/index.js';
+import { loadSkills, registerSkills, isSkillFunction, getSkillTools, handleSkillCall, callSkillDirectly } from './skills/index.js';
 import type { HandleSkillCallDeps } from './skills/index.js';
 
 // ─── Security Helpers ───
@@ -751,6 +751,9 @@ const callAccept = {
     // Track this socket so we can reference it later
     activeCallSockets.set(callId, ws);
 
+    // Caller phone available to both open and close handlers
+    const callerPhone = inbound?.from ?? null;
+
     ws.on('open', () => {
       writeJsonl({ type: 'ws.open', call_id: callId, received_at: new Date().toISOString() });
 
@@ -765,6 +768,53 @@ const callAccept = {
       }).catch((e) => {
         writeJsonl({ type: 'c2.calendar_prefetch', call_id: callId, received_at: new Date().toISOString(), status: 'error', error: String(e) });
       });
+
+      // CRM auto-lookup — runtime-managed, not Amber's responsibility.
+      // Look up the caller by phone number and inject any known context into the session
+      // so Amber can personalize the greeting and conversation from the start.
+      if (callerPhone) {
+        const crmApiDeps = {
+          clawdClient,
+          operatorName: OPERATOR_NAME || '',
+          callId,
+          callerId: callerPhone,
+          transcript: '',
+          writeJsonl,
+        };
+        callSkillDirectly('crm', { action: 'lookup_contact', phone: callerPhone }, crmApiDeps)
+          .then((crmResult) => {
+            writeJsonl({ type: 'c2.crm_lookup', call_id: callId, received_at: new Date().toISOString(), found: !!(crmResult.result?.contact) });
+
+            if (crmResult.skipped) return; // private number, skip
+
+            const contact = crmResult.result?.contact;
+            const interactions = crmResult.result?.interactions ?? [];
+            if (!contact) return; // new caller, nothing to inject
+
+            // Build a concise CRM context block to inject into Amber's session
+            const namePart = contact.name ? `Caller's name: ${contact.name}.` : '';
+            const notesPart = contact.context_notes ? `Personal context: ${contact.context_notes}` : '';
+            const historyPart = interactions.length > 0
+              ? `Last call: ${interactions[0].summary || '(no summary)'} (${interactions[0].created_at?.slice(0, 10)}).`
+              : '';
+            const crmContext = [namePart, notesPart, historyPart].filter(Boolean).join(' ');
+
+            if (!crmContext) return;
+
+            // Inject into live session via session.update — Amber sees this as part of her instructions
+            const crmSessionUpdate = {
+              type: 'session.update',
+              session: {
+                instructions: `[CRM CONTEXT — use naturally, never recite robotically]\n${crmContext}\n\nGreet the caller by name if known. Reference personal context warmly and naturally, like a human who simply remembers people.`,
+              },
+            };
+            ws.send(JSON.stringify(crmSessionUpdate));
+            writeJsonl({ type: 'c2.crm_context_injected', call_id: callId, received_at: new Date().toISOString(), contact_name: contact.name });
+          })
+          .catch((e) => {
+            writeJsonl({ type: 'c2.crm_lookup_error', call_id: callId, received_at: new Date().toISOString(), error: String(e) });
+          });
+      }
 
       // Phase C2: Re-register tools + VAD tuning via session.update
       {
@@ -962,6 +1012,46 @@ const callAccept = {
       });
       await Promise.all([endStream(jsonlStream), endStream(transcriptStream)]);
       await finalizeSummaryFromTranscript(callId);
+
+      // CRM auto-log — runtime-managed. Read the transcript, upsert contact, log interaction.
+      // This runs regardless of whether Amber called the CRM herself during the call.
+      if (callerPhone) {
+        try {
+          const transcriptText = fs.existsSync(logsTranscriptPath(callId))
+            ? fs.readFileSync(logsTranscriptPath(callId), 'utf8').trim()
+            : '';
+
+          const crmApiDeps = {
+            clawdClient,
+            operatorName: OPERATOR_NAME || '',
+            callId,
+            callerId: callerPhone,
+            transcript: transcriptText,
+            writeJsonl,
+          };
+
+          // Upsert contact — ensures record exists even if caller never said their name
+          await callSkillDirectly('crm', { action: 'upsert_contact', phone: callerPhone }, crmApiDeps);
+
+          // Log the interaction with a basic summary derived from the transcript
+          const direction = outboundObjective ? 'outbound' : 'inbound';
+          const summary = transcriptText
+            ? transcriptText.split('\n').slice(0, 3).join(' ').slice(0, 300)
+            : '(no transcript)';
+
+          await callSkillDirectly('crm', {
+            action: 'log_interaction',
+            phone: callerPhone,
+            summary,
+            outcome: 'other',
+            details: { direction, call_id: callId, auto_logged: true },
+          }, crmApiDeps);
+
+          writeJsonl({ type: 'c2.crm_auto_logged', call_id: callId, received_at: new Date().toISOString(), phone: callerPhone });
+        } catch (e) {
+          writeJsonl({ type: 'c2.crm_auto_log_error', call_id: callId, received_at: new Date().toISOString(), error: String(e) });
+        }
+      }
 
       // Dashboard auto-refresh: the bridge writes a marker file after each call.
       // Use an external file watcher or cron job to trigger process_logs.js when this file changes.
