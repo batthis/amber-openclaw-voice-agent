@@ -17,3 +17,6 @@ dashboard/data/meta.js
 # Sample files (anonymized demo data) are intentionally kept
 # dashboard/data/sample.* — DO NOT exclude
 runtime/contacts-cache.json
+demo/demo-new.*
+runtime/.env.backup*
+runtime/src/ical-query.swift
