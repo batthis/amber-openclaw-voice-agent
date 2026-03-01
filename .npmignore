@@ -10,3 +10,6 @@ demo/*.cast
 demo/*.gif
 runtime/logs/
 **/.env*
+.git/
+**/.git/
+runtime/.env.backup*
