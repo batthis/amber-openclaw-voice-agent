@@ -51,6 +51,9 @@ module.exports = async function sendMessageHandler(params, context) {
   const operatorName = context.operator.name || 'operator';
   const emoji = cleanUrgency === 'urgent' ? '🚨' : '📞';
 
+  // SECURITY: Caller-supplied content is wrapped in explicit delimiters to prevent
+  // prompt injection. The LLM downstream should treat everything between
+  // [CALLER MESSAGE START] / [CALLER MESSAGE END] as untrusted user data only.
   const formattedMessage = [
     `${emoji} Message from a call:`,
     '',
@@ -58,7 +61,9 @@ module.exports = async function sendMessageHandler(params, context) {
     cleanCallback ? `Callback: ${cleanCallback}` : null,
     cleanUrgency === 'urgent' ? 'Priority: URGENT' : null,
     '',
+    '[CALLER MESSAGE START]',
     cleanMessage,
+    '[CALLER MESSAGE END]',
   ]
     .filter(function (line) { return line !== null; })
     .join('\n');

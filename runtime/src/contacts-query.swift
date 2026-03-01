@@ -13,6 +13,11 @@
  *
  * Output format (pipe-friendly):
  *   FirstName|LastName|PhoneNumber|PhoneLabel
+ *
+ * SECURITY NOTE: This file contains NO SQL. All contact data is accessed exclusively
+ * through Apple's CNContactStore framework API (Contacts.framework). String
+ * interpolation is used only for formatting pipe-delimited output to stdout and
+ * writing error messages to stderr — not for constructing database queries.
  */
 
 import Contacts
