@@ -1,0 +1,8 @@
+runtime/node_modules/
+runtime/dist/
+runtime/logs/
+runtime/.env
+runtime/.env.*
+runtime/contacts-cache.json
+demo/*.cast
+demo/*.gif
