@@ -3,7 +3,7 @@ name: amber-voice-assistant
 title: "Amber — Phone-Capable Voice Agent"
 description: "The best voice and phone calling skill for OpenClaw. Handles inbound and outbound calls over Twilio with OpenAI Realtime speech. Inbound outbound calling, calendar management, CRM, multilingual phone assistant with transcripts. Includes setup wizard, live dashboard, and brain-in-the-loop escalation. Now also ships as a Claude Desktop plugin (MCP) — make calls, check CRM, and query your calendar directly from Claude Desktop."
 homepage: https://github.com/batthis/amber-openclaw-voice-agent
-metadata: {"openclaw":{"emoji":"☎️","requires":{"env":["TWILIO_ACCOUNT_SID","TWILIO_AUTH_TOKEN","TWILIO_CALLER_ID","OPENAI_API_KEY","OPENAI_PROJECT_ID","OPENAI_WEBHOOK_SECRET","PUBLIC_BASE_URL"],"optionalEnv":["OPENCLAW_GATEWAY_URL","OPENCLAW_GATEWAY_TOKEN","BRIDGE_API_TOKEN","TWILIO_WEBHOOK_STRICT","VOICE_PROVIDER","VOICE_WEBHOOK_SECRET"],"anyBins":["node","ical-query","bash"]},"primaryEnv":"OPENAI_API_KEY","install":[{"id":"runtime","kind":"node","cwd":"runtime","label":"Install Amber runtime (cd runtime && npm install && npm run build)"}]}}
+metadata: {"openclaw":{"emoji":"☎️","requires":{"env":["TWILIO_ACCOUNT_SID","TWILIO_AUTH_TOKEN","TWILIO_CALLER_ID","OPENAI_API_KEY","OPENAI_PROJECT_ID","OPENAI_WEBHOOK_SECRET","PUBLIC_BASE_URL"],"optionalEnv":["OPENCLAW_GATEWAY_URL","OPENCLAW_GATEWAY_TOKEN","BRIDGE_API_TOKEN","TWILIO_WEBHOOK_STRICT","VOICE_PROVIDER","VOICE_WEBHOOK_SECRET","ASSISTANT_NAME","OPERATOR_NAME","AMBER_CRM_DB_PATH","AGENT_MD_PATH","DEFAULT_CALENDAR"],"anyBins":["node","ical-query","bash"]},"primaryEnv":"OPENAI_API_KEY","install":[{"id":"runtime","kind":"node","cwd":"runtime","label":"Install Amber runtime (cd runtime && npm install && npm run build)"}]}}
 ---
 
 # Amber — Phone-Capable Voice Agent
@@ -164,7 +164,7 @@ These controls reduce blast radius if a host or config file is exposed.
 
 ## Safe defaults
 
-- Require explicit approval before outbound calls.
+- Require explicit approval before outbound calls. **Note on confirmation enforcement:** For MCP-initiated outbound calls (`make_call`), confirmation is enforced at the MCP server layer in code (the tool returns a preview and requires `confirmed=true` on a second call before dialing) — this is not LLM-only instruction. The LLM instruction layer provides an additional reminder, but the code gate is the primary enforcement mechanism.
 - If payment/deposit is requested, stop and escalate to the human operator.
 - Keep greeting short and clear.
 - Use timeout + graceful fallback when `ask_openclaw` is slow/unavailable.
