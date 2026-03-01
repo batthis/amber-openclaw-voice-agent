@@ -366,10 +366,135 @@ ${c.bold}${c.cyan}╔═══════════════════�
     }
   }
 
+  // ── Native Tools (macOS only) ────────────────────────────────────
+  if (process.platform === 'darwin') {
+    head('Native Tools (macOS)');
+    info('Amber uses native macOS tools for Calendar and Contacts access.');
+    info('These need to be compiled from Swift source (one-time).');
+
+    // Check for Swift compiler
+    let hasSwift = false;
+    try {
+      execSync('which swiftc', { stdio: 'pipe' });
+      hasSwift = true;
+      ok('Swift compiler found');
+    } catch (_) {
+      warn('Swift compiler not found. Install Xcode Command Line Tools:');
+      info('  xcode-select --install');
+      info('You can re-run setup after installing to compile native tools.');
+    }
+
+    if (hasSwift) {
+      const srcDir = resolve(__dirname, 'src');
+      const toolsDir = resolve(__dirname, '..', 'tools');
+
+      // Ensure tools directory exists
+      const { mkdirSync } = await import('node:fs');
+      try { mkdirSync(toolsDir, { recursive: true }); } catch (_) {}
+
+      // ── ical-query ──
+      const icalSrc = resolve(srcDir, 'ical-query.swift');
+      const icalBin = resolve(toolsDir, 'ical-query');
+      if (existsSync(icalSrc)) {
+        if (existsSync(icalBin)) {
+          ok('ical-query already compiled');
+        } else if (await yesNo('Compile ical-query (Calendar access)?')) {
+          const s = spinner('Compiling ical-query…');
+          try {
+            execSync(`swiftc "${icalSrc}" -o "${icalBin}" -framework EventKit -O`, { stdio: 'pipe', timeout: 60000 });
+            s.stop(); ok('ical-query compiled');
+          } catch (e) {
+            s.stop(); fail(`ical-query compilation failed: ${e.message}`);
+          }
+        }
+      } else {
+        info('ical-query source not found — skipping (Calendar features may be limited)');
+      }
+
+      // ── Grant permissions ──
+      const compiledTools = [];
+      if (existsSync(icalBin)) compiledTools.push({ name: 'ical-query', bin: icalBin, what: 'Calendar' });
+
+      if (compiledTools.length > 0) {
+        head('macOS Permissions');
+        info('macOS requires you to grant Calendar and Contacts access.');
+        info('A system dialog will appear for each — click "Allow".\n');
+
+        for (const tool of compiledTools) {
+          if (await yesNo(`Grant ${tool.what} access now?`)) {
+            try {
+              // Run a harmless query to trigger the macOS permission prompt
+              const testCmd = tool.name === 'ical-query' ? 'today' : 'search test';
+              execSync(`"${tool.bin}" ${testCmd}`, { stdio: 'pipe', timeout: 30000 });
+              ok(`${tool.what} access granted`);
+            } catch (e) {
+              const errMsg = e.stderr?.toString() || e.message || '';
+              if (errMsg.includes('denied') || errMsg.includes('Denied')) {
+                warn(`${tool.what} access was denied. Grant it manually:`);
+                info(`  System Settings → Privacy & Security → ${tool.what} → enable ${tool.name}`);
+              } else {
+                // Non-permission error — the command may have run fine but returned non-zero
+                // (e.g., no calendar events today). Check if it was actually a permission issue.
+                ok(`${tool.what} permission prompt triggered — check if you saw a dialog`);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // ── Claude Desktop / Cowork Setup ───────────────────────────────
+  head('Claude Desktop / Cowork Plugin (optional)');
+  info('Amber can also run as an MCP plugin for Claude Desktop.');
+  const isCowork = await yesNo('Are you setting up for Claude Desktop / Cowork?', false);
+
+  // ── Contacts Sync (macOS + Cowork only) ─────────────────────────
+  if (process.platform === 'darwin' && isCowork) {
+    head('Apple Contacts Sync');
+    info('Amber can look up contacts from your Apple address book.');
+    info('This exports your contacts to a local JSON cache file.');
+    info('(The cache stays on your machine — nothing is uploaded.)\n');
+
+    if (await yesNo('Sync Apple Contacts now?')) {
+      const s = spinner('Exporting contacts…');
+      try {
+        const syncScript = resolve(__dirname, 'scripts', 'sync-contacts.js');
+        execSync(`node "${syncScript}"`, { cwd: __dirname, stdio: 'pipe', timeout: 30000 });
+        s.stop();
+        const cachePath = resolve(__dirname, 'contacts-cache.json');
+        if (existsSync(cachePath)) {
+          const cache = JSON.parse(readFileSync(cachePath, 'utf8'));
+          ok(`Exported ${cache.count} contacts to contacts-cache.json`);
+        } else {
+          ok('Contacts sync completed');
+        }
+        info('To refresh later: npm run sync-contacts');
+      } catch (e) {
+        s.stop();
+        const errMsg = e.stderr?.toString() || e.message || '';
+        if (errMsg.includes('denied') || errMsg.includes('EPERM')) {
+          fail('Contacts access denied.');
+          info('Grant Full Disk Access to Terminal:');
+          info('  System Settings → Privacy & Security → Full Disk Access → enable Terminal');
+          info('Then re-run: npm run sync-contacts');
+        } else {
+          fail(`Contacts sync failed: ${e.message}`);
+        }
+      }
+    } else {
+      info('Skipped. Run later: npm run sync-contacts');
+    }
+  }
+
   // ── Summary ────────────────────────────────────────────────────────
   head('All Done! 🎉');
 
   const webhookUrl = `${cfg.PUBLIC_BASE_URL}/twilio/inbound`;
+  const hasNativeTools = process.platform === 'darwin' &&
+    existsSync(resolve(__dirname, '..', 'tools', 'ical-query'));
+  const hasContactsCache = isCowork && existsSync(resolve(__dirname, 'contacts-cache.json'));
+
   console.log(`
 ${c.bold}Next steps:${c.reset}
 
@@ -383,7 +508,16 @@ ${c.bold}Next steps:${c.reset}
 
   3. ${c.cyan}Test it:${c.reset}
      Call ${c.bold}${cfg.TWILIO_CALLER_ID}${c.reset} — your voice assistant should answer!
-
+${hasNativeTools ? `
+  4. ${c.cyan}Calendar access:${c.reset}
+     ical-query compiled and configured.
+     If permission was denied, grant it in:
+     ${c.bold}System Settings → Privacy & Security → Calendar${c.reset}
+` : ''}${hasContactsCache ? `
+  ${hasNativeTools ? '5' : '4'}. ${c.cyan}Contacts:${c.reset}
+     Apple Contacts synced to local cache.
+     To refresh: ${c.bold}npm run sync-contacts${c.reset}
+` : ''}
 ${c.dim}Config saved to: ${envPath}${c.reset}
 `);
 

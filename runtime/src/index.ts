@@ -410,6 +410,24 @@ type OutboundIntent = {
 const OUTBOUND_INTENT_RETENTION_MS = 10 * 60 * 1000;
 const outboundIntentByKey = new Map<string, OutboundIntent>();
 
+// ─── Restore outbound intent map from disk on startup ───
+// This ensures Twilio webhook callbacks still work after a bridge restart.
+{
+  const mapPath = path.join(process.cwd(), 'data', 'bridge-outbound-map.json');
+  try {
+    if (fs.existsSync(mapPath)) {
+      const persisted: Record<string, OutboundIntent> = JSON.parse(fs.readFileSync(mapPath, 'utf8'));
+      const cutoff = Date.now() - OUTBOUND_INTENT_RETENTION_MS;
+      for (const [k, v] of Object.entries(persisted)) {
+        if (v.createdAtMs > cutoff) outboundIntentByKey.set(k, v);
+      }
+      console.log(`[startup] Restored ${outboundIntentByKey.size} outbound intent(s) from disk.`);
+    }
+  } catch (e) {
+    console.warn('[startup] Could not restore outbound intent map:', e);
+  }
+}
+
 // Twilio callbacks are typically form-encoded
 app.use('/twilio', express.urlencoded({ extended: false }));
 app.use('/twiml', express.urlencoded({ extended: false }));
@@ -806,16 +824,28 @@ const callAccept = {
           // Known contact — give Amber the context and let her improvise a personalized greeting.
           // Do NOT hardcode the greeting text; let her use the name and context naturally.
           const contextLine = crmContact.context_notes
-            ? `Personal context you know about them: ${crmContact.context_notes}`
+            ? `Background context you know about them (do NOT bring this up unless relevant to the objective): ${crmContact.context_notes}`
             : '';
           const direction = outboundObjective ? 'calling' : 'receiving a call from';
-          greetingInstruction = [
-            `[CRM] You are ${direction} ${crmContact.name}. The person on the line IS ${crmContact.name} — do not refer to them in third person.`,
-            contextLine,
-            `Greet them warmly by name, like you remember them. Be natural — not robotic.`,
-            `If you know something personal (like their dog being sick), you can mention it warmly.`,
-            `Keep it short and let them respond.`,
-          ].filter(Boolean).join(' ');
+
+          if (outboundObjective) {
+            // Outbound: be personable with context, but always pivot to the objective.
+            greetingInstruction = [
+              `[CRM] You are calling ${crmContact.name}. The person on the line IS ${crmContact.name}.`,
+              contextLine,
+              `Your objective for this call is: ${outboundObjective}`,
+              `Be yourself — warm, playful, a little flirty. Greet them by name like you're happy to hear them. If you have personal context, weave it in naturally (one quick line) — then pivot with something like "but the real reason I'm calling..." and pursue the objective. Stay on task but keep your personality. Don't become a robot just because you have a mission.`,
+            ].filter(Boolean).join(' ');
+          } else {
+            // Inbound: personalized greeting with context is appropriate.
+            greetingInstruction = [
+              `[CRM] You are receiving a call from ${crmContact.name}. The person on the line IS ${crmContact.name} — do not refer to them in third person.`,
+              contextLine,
+              `Greet them warmly by name, like you remember them. Be natural — not robotic.`,
+              `If you know something personal (like their dog being sick), you can mention it warmly.`,
+              `Keep it short and let them respond.`,
+            ].filter(Boolean).join(' ');
+          }
         } else {
           // Unknown caller — use the standard greeting
           greetingInstruction = `Say to the user: ${greeting}`;

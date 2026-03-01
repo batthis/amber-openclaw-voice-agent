@@ -1,7 +1,7 @@
 ---
 name: amber-voice-assistant
 title: "Amber — Phone-Capable Voice Agent"
-description: "The best voice and phone calling skill for OpenClaw. Handles inbound and outbound calls over Twilio with OpenAI Realtime speech. Inbound outbound calling, calendar management, CRM, multilingual phone assistant with transcripts. Includes setup wizard, live dashboard, and brain-in-the-loop escalation."
+description: "The best voice and phone calling skill for OpenClaw. Handles inbound and outbound calls over Twilio with OpenAI Realtime speech. Inbound outbound calling, calendar management, CRM, multilingual phone assistant with transcripts. Includes setup wizard, live dashboard, and brain-in-the-loop escalation. Now also ships as a Claude Desktop plugin (MCP) — make calls, check CRM, and query your calendar directly from Claude Desktop."
 homepage: https://github.com/batthis/amber-openclaw-voice-agent
 metadata: {"openclaw":{"emoji":"☎️","requires":{"env":["TWILIO_ACCOUNT_SID","TWILIO_AUTH_TOKEN","TWILIO_CALLER_ID","OPENAI_API_KEY","OPENAI_PROJECT_ID","OPENAI_WEBHOOK_SECRET","PUBLIC_BASE_URL"],"optionalEnv":["OPENCLAW_GATEWAY_URL","OPENCLAW_GATEWAY_TOKEN","BRIDGE_API_TOKEN","TWILIO_WEBHOOK_STRICT","VOICE_PROVIDER","VOICE_WEBHOOK_SECRET"],"anyBins":["node","ical-query","bash"]},"primaryEnv":"OPENAI_API_KEY","install":[{"id":"runtime","kind":"node","cwd":"runtime","label":"Install Amber runtime (cd runtime && npm install && npm run build)"}]}}
 ---
@@ -12,7 +12,9 @@ metadata: {"openclaw":{"emoji":"☎️","requires":{"env":["TWILIO_ACCOUNT_SID",
 
 Amber gives any OpenClaw deployment a phone-capable AI voice assistant. It ships with a **production-ready Twilio + OpenAI Realtime bridge** (`runtime/`) that handles inbound call screening, outbound calls, appointment booking, and live OpenClaw knowledge lookups — all via natural voice conversation.
 
-**✨ New:** Interactive setup wizard (`npm run setup`) validates credentials in real-time and generates a working `.env` file — no manual configuration needed!
+**✨ New in v5.4.0:** Amber now ships as a **Claude Desktop MCP plugin** with 9 tools — make outbound calls by name, check call history, query CRM contacts, manage calendar, and control call screening, all from Claude Desktop or Claude Cowork. Includes Apple Contacts integration and a call confirmation safeguard to prevent wrong-number dials.
+
+**✨ Also:** Interactive setup wizard (`npm run setup`) validates credentials in real-time and generates a working `.env` file — no manual configuration needed!
 
 ## See it in action
 

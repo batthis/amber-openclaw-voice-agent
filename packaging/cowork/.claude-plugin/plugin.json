@@ -1,0 +1,21 @@
+{
+  "name": "amber-voice-agent",
+  "version": "0.1.0",
+  "description": "Give Claude a phone. Make and receive real phone calls, screen incoming calls, book appointments, and manage contacts — all through voice via Twilio.",
+  "author": {
+    "name": "Abe Batthish",
+    "homepage": "https://clawhub.com/skills/amber-voice-assistant"
+  },
+  "keywords": [
+    "voice",
+    "phone",
+    "calls",
+    "twilio",
+    "receptionist",
+    "telephony",
+    "appointments",
+    "call-screening"
+  ],
+  "repository": "https://github.com/anthropics/knowledge-work-plugins",
+  "license": "MIT"
+}
