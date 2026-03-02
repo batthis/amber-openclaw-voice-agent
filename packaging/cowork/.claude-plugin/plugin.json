@@ -17,5 +17,5 @@
     "call-screening"
   ],
   "repository": "https://github.com/anthropics/knowledge-work-plugins",
-  "license": "MIT"
+  "license": "Apache-2.0"
 }
