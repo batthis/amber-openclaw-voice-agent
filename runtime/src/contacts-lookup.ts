@@ -3,11 +3,14 @@
  *
  * Queries the local Apple Contacts (AddressBook) SQLite databases
  * to resolve contact names to phone numbers.
- * 
+ *
  * Searches across all iCloud-synced source databases for maximum coverage.
+ *
+ * SECURITY NOTE: All SQL queries use parameterized statements via better-sqlite3.
+ * No user input is ever interpolated into SQL strings. The sqlite3 CLI is not used.
  */
 
-import { execFileSync } from 'node:child_process';
+import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -27,11 +30,9 @@ function findAddressBookDbs(): string[] {
   const baseDir = path.join(os.homedir(), 'Library', 'Application Support', 'AddressBook');
   const dbs: string[] = [];
 
-  // Main DB
   const mainDb = path.join(baseDir, 'AddressBook-v22.abcddb');
   if (fs.existsSync(mainDb)) dbs.push(mainDb);
 
-  // Source DBs (iCloud, Google, etc.)
   const sourcesDir = path.join(baseDir, 'Sources');
   if (fs.existsSync(sourcesDir)) {
     for (const source of fs.readdirSync(sourcesDir)) {
@@ -47,73 +48,75 @@ function findAddressBookDbs(): string[] {
  * Normalize a phone number to E.164-ish format for comparison.
  */
 function normalizePhone(phone: string): string {
-  // Strip everything except digits and leading +
   const digits = phone.replace(/[^\d+]/g, '');
-  // If starts with 1 and is 11 digits, add +
   if (digits.length === 11 && digits.startsWith('1')) return '+' + digits;
-  // If 10 digits, assume US/CA
   if (digits.length === 10) return '+1' + digits;
-  // If already has +, keep as-is
   if (digits.startsWith('+')) return digits;
   return digits;
 }
 
 /**
  * Search contacts by name (fuzzy, case-insensitive).
+ *
+ * Uses parameterized LIKE queries — no string interpolation in SQL.
  */
 export function searchByName(query: string): ContactResult[] {
   const dbs = findAddressBookDbs();
   const results: ContactResult[] = [];
-  const seen = new Set<string>(); // dedupe by normalized phone
+  const seen = new Set<string>();
 
-  const sanitizedQuery = query.replace(/['"\\;]/g, '').trim();
-  if (!sanitizedQuery) return [];
+  const trimmed = query.trim();
+  if (!trimmed) return [];
+
+  // Parameterized LIKE value — percent signs are part of the bound value, not SQL
+  const likeParam = `%${trimmed}%`;
 
   for (const db of dbs) {
+    let conn: InstanceType<typeof Database> | null = null;
     try {
-      const sql = `
+      conn = new Database(db, { readonly: true, fileMustExist: true });
+
+      // All user input is passed as bound parameters — never interpolated into SQL
+      const stmt = conn.prepare(`
         SELECT r.ZFIRSTNAME, r.ZLASTNAME, p.ZFULLNUMBER, p.ZLABEL
         FROM ZABCDRECORD r
         JOIN ZABCDPHONENUMBER p ON p.ZOWNER = r.Z_PK
         WHERE (
-          r.ZFIRSTNAME LIKE '%${sanitizedQuery}%' COLLATE NOCASE
-          OR r.ZLASTNAME LIKE '%${sanitizedQuery}%' COLLATE NOCASE
-          OR (r.ZFIRSTNAME || ' ' || r.ZLASTNAME) LIKE '%${sanitizedQuery}%' COLLATE NOCASE
-          OR r.ZNICKNAME LIKE '%${sanitizedQuery}%' COLLATE NOCASE
-          OR r.ZORGANIZATION LIKE '%${sanitizedQuery}%' COLLATE NOCASE
+          r.ZFIRSTNAME LIKE ? COLLATE NOCASE
+          OR r.ZLASTNAME LIKE ? COLLATE NOCASE
+          OR (r.ZFIRSTNAME || ' ' || r.ZLASTNAME) LIKE ? COLLATE NOCASE
+          OR r.ZNICKNAME LIKE ? COLLATE NOCASE
+          OR r.ZORGANIZATION LIKE ? COLLATE NOCASE
         )
-        AND p.ZFULLNUMBER IS NOT NULL;
-      `;
+        AND p.ZFULLNUMBER IS NOT NULL
+      `);
 
-      const output = execFileSync('/usr/bin/sqlite3', [db, sql], {
-        encoding: 'utf8',
-        timeout: 5000,
-      }).trim();
+      const rows = stmt.all(likeParam, likeParam, likeParam, likeParam, likeParam) as any[];
 
-      if (!output) continue;
-
-      for (const line of output.split('\n')) {
-        const [firstName, lastName, phone, label] = line.split('|');
+      for (const row of rows) {
+        const firstName = row.ZFIRSTNAME || null;
+        const lastName = row.ZLASTNAME || null;
+        const phone = (row.ZFULLNUMBER || '').trim();
+        const label = row.ZLABEL || null;
         if (!phone) continue;
 
         const normalized = normalizePhone(phone);
         const dedupeKey = `${(firstName || '').toLowerCase()}_${(lastName || '').toLowerCase()}_${normalized}`;
-
         if (seen.has(dedupeKey)) continue;
         seen.add(dedupeKey);
 
-        const fullName = [firstName, lastName].filter(Boolean).join(' ') || 'Unknown';
-
         results.push({
-          firstName: firstName || null,
-          lastName: lastName || null,
-          fullName,
-          phone: phone.trim(),
-          label: label || null,
+          firstName,
+          lastName,
+          fullName: [firstName, lastName].filter(Boolean).join(' ') || 'Unknown',
+          phone,
+          label,
         });
       }
     } catch {
-      // Skip databases that fail to query
+      // Skip databases that fail to open or query
+    } finally {
+      conn?.close();
     }
   }
 
@@ -121,60 +124,58 @@ export function searchByName(query: string): ContactResult[] {
 }
 
 /**
- * Search contacts by phone number.
+ * Search contacts by phone number (last 10 digits, formatting-agnostic).
+ *
+ * Uses parameterized queries — no user input interpolated into SQL.
  */
 export function searchByPhone(phone: string): ContactResult[] {
   const dbs = findAddressBookDbs();
   const results: ContactResult[] = [];
   const seen = new Set<string>();
 
-  // Extract just digits for LIKE matching
   const digits = phone.replace(/\D/g, '');
-  if (digits.length < 7) return []; // too short to be meaningful
+  if (digits.length < 7) return [];
 
-  // Use last 10 digits for matching (strip country code)
+  // Match against last 10 digits to handle country code variations
   const searchDigits = digits.slice(-10);
+  const likeParam = `%${searchDigits}%`;
 
   for (const db of dbs) {
+    let conn: InstanceType<typeof Database> | null = null;
     try {
-      // SQLite doesn't have regex, so we search for the digit sequence
-      // within the phone number (which may have formatting)
-      const sql = `
+      conn = new Database(db, { readonly: true, fileMustExist: true });
+
+      // Strip formatting from stored numbers using SQLite REPLACE, then parameterized LIKE
+      const stmt = conn.prepare(`
         SELECT r.ZFIRSTNAME, r.ZLASTNAME, p.ZFULLNUMBER, p.ZLABEL
         FROM ZABCDRECORD r
         JOIN ZABCDPHONENUMBER p ON p.ZOWNER = r.Z_PK
-        WHERE REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(p.ZFULLNUMBER, ' ', ''), '-', ''), '(', ''), ')', ''), '+', '')
-          LIKE '%${searchDigits}%'
-        AND p.ZFULLNUMBER IS NOT NULL;
-      `;
+        WHERE REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+          p.ZFULLNUMBER, ' ', ''), '-', ''), '(', ''), ')', ''), '+', ''
+        ) LIKE ?
+        AND p.ZFULLNUMBER IS NOT NULL
+      `);
 
-      const output = execFileSync('/usr/bin/sqlite3', [db, sql], {
-        encoding: 'utf8',
-        timeout: 5000,
-      }).trim();
+      const rows = stmt.all(likeParam) as any[];
 
-      if (!output) continue;
-
-      for (const line of output.split('\n')) {
-        const [firstName, lastName, foundPhone, label] = line.split('|');
+      for (const row of rows) {
+        const firstName = row.ZFIRSTNAME || null;
+        const lastName = row.ZLASTNAME || null;
+        const foundPhone = (row.ZFULLNUMBER || '').trim();
+        const label = row.ZLABEL || null;
         if (!foundPhone) continue;
 
         const fullName = [firstName, lastName].filter(Boolean).join(' ') || 'Unknown';
         const dedupeKey = `${fullName.toLowerCase()}_${normalizePhone(foundPhone)}`;
-
         if (seen.has(dedupeKey)) continue;
         seen.add(dedupeKey);
 
-        results.push({
-          firstName: firstName || null,
-          lastName: lastName || null,
-          fullName,
-          phone: foundPhone.trim(),
-          label: label || null,
-        });
+        results.push({ firstName, lastName, fullName, phone: foundPhone, label });
       }
     } catch {
       // Skip databases that fail
+    } finally {
+      conn?.close();
     }
   }
 
