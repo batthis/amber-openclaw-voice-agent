@@ -3,7 +3,6 @@ name: amber-voice-assistant
 title: "Amber — Phone-Capable Voice Agent"
 description: "The most complete voice and phone calling skill for OpenClaw. Handles inbound and outbound phone calls over Twilio with OpenAI Realtime speech. Inbound outbound calling, calendar management, CRM, multilingual phone assistant with transcripts. Includes setup wizard, live dashboard, and brain-in-the-loop escalation. Now also ships as a Claude Desktop plugin (MCP) — make calls, check CRM, and query your calendar directly from Claude Desktop."
 homepage: https://github.com/batthis/amber-openclaw-voice-agent
-license: Apache-2.0
 metadata: {"openclaw":{"emoji":"☎️","requires":{"env":["TWILIO_ACCOUNT_SID","TWILIO_AUTH_TOKEN","TWILIO_CALLER_ID","OPENAI_API_KEY","OPENAI_PROJECT_ID","OPENAI_WEBHOOK_SECRET","PUBLIC_BASE_URL"],"optionalEnv":["OPENCLAW_GATEWAY_URL","OPENCLAW_GATEWAY_TOKEN","BRIDGE_API_TOKEN","TWILIO_WEBHOOK_STRICT","VOICE_PROVIDER","VOICE_WEBHOOK_SECRET","ASSISTANT_NAME","OPERATOR_NAME","AMBER_CRM_DB_PATH","AGENT_MD_PATH","DEFAULT_CALENDAR"],"anyBins":["node","ical-query","bash"]},"primaryEnv":"OPENAI_API_KEY","install":[{"id":"runtime","kind":"node","cwd":"runtime","label":"Install Amber runtime (cd runtime && npm install && npm run build)"}]}}
 ---
 
