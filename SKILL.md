@@ -1,16 +1,16 @@
 ---
 name: amber-voice-assistant
 title: "Amber — Phone-Capable Voice Agent"
-description: "The most complete voice and phone calling skill for OpenClaw. Handles inbound and outbound phone calls over Twilio with OpenAI Realtime speech. Inbound outbound calling, calendar management, CRM, multilingual phone assistant with transcripts. Includes setup wizard, live dashboard, and brain-in-the-loop escalation. Now also ships as a Claude Desktop plugin (MCP) — make calls, check CRM, and query your calendar directly from Claude Desktop."
+description: "AI phone assistant and virtual receptionist for OpenClaw. Answers inbound phone calls, screens callers, makes outbound phone calls, and books appointments — all over Twilio + OpenAI Realtime voice. Full telephone workflow: phone call screening, live call transcripts, CRM contact memory, calendar integration. Ideal for anyone who wants an AI to answer their phone, handle call screening, or make phone calls autonomously. Includes interactive setup wizard, live call dashboard, and human-in-the-loop escalation. Also ships as a Claude Desktop MCP plugin — dial phone numbers, check call history, query CRM, and manage calendar directly from Claude Desktop."
 homepage: https://github.com/batthis/amber-openclaw-voice-agent
 metadata: {"openclaw":{"emoji":"☎️","requires":{"env":["TWILIO_ACCOUNT_SID","TWILIO_AUTH_TOKEN","TWILIO_CALLER_ID","OPENAI_API_KEY","OPENAI_PROJECT_ID","OPENAI_WEBHOOK_SECRET","PUBLIC_BASE_URL"],"optionalEnv":["OPENCLAW_GATEWAY_URL","OPENCLAW_GATEWAY_TOKEN","BRIDGE_API_TOKEN","TWILIO_WEBHOOK_STRICT","VOICE_PROVIDER","VOICE_WEBHOOK_SECRET","ASSISTANT_NAME","OPERATOR_NAME","AMBER_CRM_DB_PATH","AGENT_MD_PATH","DEFAULT_CALENDAR"],"anyBins":["node","ical-query","bash"]},"primaryEnv":"OPENAI_API_KEY","install":[{"id":"runtime","kind":"node","cwd":"runtime","label":"Install Amber runtime (cd runtime && npm install && npm run build)"}]}}
 ---
 
-# Amber — Phone-Capable Voice Agent
+# Amber — AI Phone Assistant & Virtual Receptionist
 
 ## Overview
 
-Amber gives any OpenClaw deployment a phone-capable AI voice assistant. It ships with a **production-ready Twilio + OpenAI Realtime bridge** (`runtime/`) that handles inbound call screening, outbound calls, appointment booking, and live OpenClaw knowledge lookups — all via natural voice conversation.
+Amber gives any OpenClaw deployment a **phone-capable AI voice assistant**. It ships with a **production-ready Twilio + OpenAI Realtime bridge** (`runtime/`) that handles inbound phone call screening, outbound phone calls, appointment booking, and live OpenClaw knowledge lookups — all via natural voice conversation over a real telephone number.
 
 **✨ New in v5.4.0:** Amber now ships as a **Claude Desktop MCP plugin** with 9 tools — make outbound calls by name, check call history, query CRM contacts, manage calendar, and control call screening, all from Claude Desktop or Claude Cowork. Includes Apple Contacts integration and a call confirmation safeguard to prevent wrong-number dials.
 
