@@ -1,16 +1,16 @@
 ---
 name: amber-voice-assistant
-title: "Amber — Phone-Capable Voice Agent"
-description: "AI phone assistant and virtual receptionist for OpenClaw. Answers inbound phone calls, screens callers, makes outbound phone calls, and books appointments — all over Twilio + OpenAI Realtime voice. Full telephone workflow: phone call screening, live call transcripts, CRM contact memory, calendar integration. Ideal for anyone who wants an AI to answer their phone, handle call screening, or make phone calls autonomously. Includes interactive setup wizard, live call dashboard, and human-in-the-loop escalation. Also ships as a Claude Desktop MCP plugin — dial phone numbers, check call history, query CRM, and manage calendar directly from Claude Desktop."
+title: "Amber — Give Your Agent Real Phone Capabilities"
+description: "Give your OpenClaw agent real phone capabilities: inbound answering, outbound calls, booking, screening, CRM memory, and real-world phone task execution."
 homepage: https://github.com/batthis/amber-openclaw-voice-agent
-metadata: {"openclaw":{"emoji":"☎️","requires":{"env":["TWILIO_ACCOUNT_SID","TWILIO_AUTH_TOKEN","TWILIO_CALLER_ID","OPENAI_API_KEY","OPENAI_PROJECT_ID","OPENAI_WEBHOOK_SECRET","PUBLIC_BASE_URL"],"optionalEnv":["OPENCLAW_GATEWAY_URL","OPENCLAW_GATEWAY_TOKEN","BRIDGE_API_TOKEN","TWILIO_WEBHOOK_STRICT","VOICE_PROVIDER","VOICE_WEBHOOK_SECRET","ASSISTANT_NAME","OPERATOR_NAME","AMBER_CRM_DB_PATH","AGENT_MD_PATH","DEFAULT_CALENDAR"],"anyBins":["node","ical-query","bash"]},"primaryEnv":"OPENAI_API_KEY","install":[{"id":"runtime","kind":"node","cwd":"runtime","label":"Install Amber runtime (cd runtime && npm install && npm run build)"}]}}
+metadata: {"openclaw":{"emoji":"☎️","requires":{"env":["TWILIO_ACCOUNT_SID","TWILIO_AUTH_TOKEN","TWILIO_CALLER_ID","OPENAI_API_KEY","OPENAI_PROJECT_ID","OPENAI_WEBHOOK_SECRET","PUBLIC_BASE_URL"],"optionalEnv":["OPENCLAW_GATEWAY_URL","OPENCLAW_GATEWAY_TOKEN","BRIDGE_API_TOKEN","TWILIO_WEBHOOK_STRICT","VOICE_PROVIDER","VOICE_WEBHOOK_SECRET","ASSISTANT_NAME","OPERATOR_NAME","AMBER_CRM_DB_PATH","AGENT_MD_PATH","DEFAULT_CALENDAR"],"anyBins":["node","ical-query","bash"]},"primaryEnv":"OPENAI_API_KEY","install":[{"id":"runtime","kind":"node","cwd":"runtime","label":"Install Amber runtime (cd runtime && npm ci && npm run build)"}]}}
 ---
 
-# Amber — AI Phone Assistant & Virtual Receptionist
+# Amber — Give Your Agent Real Phone Capabilities
 
 ## Overview
 
-Amber gives any OpenClaw deployment a **phone-capable AI voice assistant**. It ships with a **production-ready Twilio + OpenAI Realtime bridge** (`runtime/`) that handles inbound phone call screening, outbound phone calls, appointment booking, and live OpenClaw knowledge lookups — all via natural voice conversation over a real telephone number.
+Amber gives any OpenClaw deployment **real phone capabilities for agents**. It ships with a **production-ready Twilio + OpenAI Realtime bridge** (`runtime/`) that lets your OpenClaw agent answer inbound calls, make outbound calls, book appointments, screen callers, and complete real-world phone tasks via natural voice conversation over a real telephone number.
 
 **✨ New in v5.4.0:** Amber now ships as a **Claude Desktop MCP plugin** with 9 tools — make outbound calls by name, check call history, query CRM contacts, manage calendar, and control call screening, all from Claude Desktop or Claude Cowork. Includes Apple Contacts integration and a call confirmation safeguard to prevent wrong-number dials.
 
@@ -28,11 +28,11 @@ Amber gives any OpenClaw deployment a **phone-capable AI voice assistant**. It s
 
 - **Runtime bridge** (`runtime/`) — a complete Node.js server that connects Twilio phone calls to OpenAI Realtime with OpenClaw brain-in-the-loop
 - **Amber Skills** (`amber-skills/`) — modular mid-call capabilities (CRM, calendar, log & forward message) with a spec for building your own
-- **Built-in CRM** — local SQLite contact database; Amber greets callers by name and references personal context naturally on every call
+- **Built-in CRM** — local SQLite contact database; Amber greets callers by name and references personal context naturally on every call, with operator review/correction responsibility
 - **Call log dashboard** (`dashboard/`) — browse call history, transcripts, and captured messages; includes **manual Sync button** to pull new calls on demand
 - **Setup & validation scripts** — preflight checks, env templates, quickstart runner
 - **Architecture docs & troubleshooting** — call flow diagrams, common failure runbooks
-- **Safety guardrails** — approval patterns for outbound calls, payment escalation, consent boundaries
+- **Safety guardrails** — approval patterns for outbound calls, payment escalation, consent boundaries, and explicit confirmation for calendar writes
 
 ## 🔌 Amber Skills — Extensible by Design
 
@@ -45,6 +45,7 @@ Amber remembers every caller across calls and uses that memory to personalize ev
 - **Runtime-managed** — lookup and logging happen automatically; Amber never has to "remember" to call CRM
 - **Personalized greeting** — known callers are greeted by name; personal context (pets, recent events, preferences) is referenced warmly on the first sentence
 - **Two-pass enrichment** — auto-log captures the call immediately; a post-call LLM extraction pass reads the full transcript to extract name, email, and `context_notes`
+- **Operator review expected** — review, correct, or delete CRM records periodically so bad transcript extraction or misleading caller input does not persist indefinitely
 - **Symmetric** — works identically for inbound and outbound calls
 - **Local SQLite** — stored at `~/.config/amber/crm.sqlite`; no cloud, no data leaves your machine
 - **Native dependency** — requires `better-sqlite3` (native build). macOS: `sudo xcodebuild -license accept` before `npm install`. Linux: `build-essential` + `python3`.
@@ -54,7 +55,7 @@ Amber remembers every caller across calls and uses that memory to personalize ev
 Query the operator's calendar for availability or schedule a new event — all during a live call.
 
 - **Availability lookups** — free/busy slots for today, tomorrow, this week, or any specific date
-- **Event creation** — book appointments directly into the operator's calendar from a phone conversation
+- **Event creation** — book appointments directly into the operator's calendar from a phone conversation, but only after explicit caller confirmation
 - **Privacy by default** — callers are only told whether the operator is free or busy; event titles, names, and locations are never disclosed
 - Powered by `ical-query` — local-only, zero network latency
 
@@ -135,7 +136,7 @@ The easiest way to get started:
 
 ### Option B: Manual setup
 
-1. `cd runtime && npm install`
+1. `cd runtime && npm ci`
 2. Copy `../references/env.example` to `runtime/.env` and fill in your values.
 3. `npm run build && npm start`
 4. Point your Twilio voice webhook to `https://<your-domain>/twilio/inbound`
@@ -157,6 +158,7 @@ Use least-privilege credentials for every provider:
 - **Twilio:** use a dedicated subaccount for Amber and rotate auth tokens regularly.
 - **OpenAI:** use a dedicated project API key for this runtime only; avoid reusing keys from unrelated apps.
 - **OpenClaw Gateway token:** only set `OPENCLAW_GATEWAY_TOKEN` if you need brain-in-the-loop lookups; keep token scope minimal.
+- **Dependency integrity:** runtime dependencies are pinned by `runtime/package-lock.json`; review dependency changes before publishing updates.
 - **Secrets in logs:** never print full credentials in scripts, setup output, or call transcripts.
 - **Setup wizard validation scope:** credential checks call only official Twilio/OpenAI API endpoints over HTTPS for auth verification; no arbitrary exfiltration endpoints are used.
 
@@ -212,7 +214,7 @@ These controls reduce blast radius if a host or config file is exposed.
 ## Install safety notes
 
 - Amber does **not** execute arbitrary install-time scripts from this repository.
-- Runtime install uses standard Node dependency installation in `runtime/`.
+- Runtime install uses standard Node dependency installation in `runtime/`, with dependencies pinned in `runtime/package-lock.json`.
 - CRM uses `better-sqlite3` (native module), which compiles locally on your machine.
 - Review `runtime/package.json` dependencies before deployment in regulated environments.
 

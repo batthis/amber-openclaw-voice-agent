@@ -1,20 +1,20 @@
-# ☎️ Amber — Phone-Capable Voice Agent
+# ☎️ Amber — Give Your Agent Real Phone Capabilities
 
-**A voice sub-agent for [OpenClaw](https://openclaw.ai)** — gives your OpenClaw deployment phone capabilities via a provider-swappable telephony bridge + OpenAI Realtime. Twilio is the default and recommended provider.
+**A phone capability layer for [OpenClaw](https://openclaw.ai)** — gives your OpenClaw agent inbound answering, outbound calling, booking, screening, and real-world phone task execution via a provider-swappable telephony bridge + OpenAI Realtime. Twilio is the default and recommended provider.
 
 [![ClawHub](https://img.shields.io/badge/ClawHub-amber--voice--assistant-blue)](https://clawhub.ai/skills/amber-voice-assistant)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ## What is Amber?
 
-Amber is not a standalone voice agent — it operates as an extension of your OpenClaw instance, delegating complex decisions (calendar lookups, contact resolution, approval workflows) back to OpenClaw mid-call via the `ask_openclaw` tool.
+Amber is not just a standalone voice bot or virtual receptionist. It operates as an extension of your OpenClaw instance, giving your agent real phone capabilities while delegating complex decisions (calendar lookups, contact resolution, approval workflows) back to OpenClaw mid-call via the `ask_openclaw` tool.
 
 ### Features
 
 - 🔉 **Inbound call screening** — greeting, message-taking, appointment booking
 - 📞 **Outbound calls** — reservations, inquiries, follow-ups with structured call plans
 - 🧠 **Brain-in-the-loop** — consults your OpenClaw gateway mid-call for calendar, contacts, preferences
-- 👤 **Built-in CRM** — remembers every caller across calls; greets by name, references personal context naturally
+- 👤 **Built-in CRM** — remembers every caller across calls; greets by name, references personal context naturally, with operator review/correction responsibility
 - 📊 **Call log dashboard** — browse history, transcripts, captured messages, follow-up tracking
 - ⚡ **Launch in minutes** — `npm install`, configure `.env`, `npm start`
 - 🔒 **Safety guardrails** — operator approval for outbound calls, payment escalation, consent boundaries
@@ -42,7 +42,7 @@ See [CRM skill docs](#-crm--contact-memory) below for details.
 ## Quick Start
 
 ```bash
-cd runtime && npm install
+cd runtime && npm ci
 cp ../references/env.example .env  # fill in your values
 npm run build && npm start
 ```
@@ -63,9 +63,11 @@ launchctl kickstart -k gui/$(id -u)/com.jarvis.twilio-bridge
 kill $(pgrep -f 'dist/index.js') && sleep 2 && node dist/index.js
 ```
 
-### Automatic Restart (Recommended for Persistent Deployments)
+### Automatic Restart (Optional, for Persistent Deployments)
 
 Amber includes a `dist-watcher` script that runs in the background and automatically restarts the runtime whenever `dist/` files are newer than the running process. This prevents the "stale runtime" problem entirely.
+
+Only enable this if you intentionally want Amber to keep running in the background.
 
 To enable it, register the provided LaunchAgent:
 
@@ -92,6 +94,7 @@ Amber remembers every caller across calls and uses that memory to make every con
 - **Automatic lookup** — at the start of every inbound and outbound call, the runtime looks up the caller by phone number before Amber speaks a single word
 - **Personalized greeting** — if the caller is known, Amber opens with their name and naturally references any personal context ("Hey Abe, how's Max doing?")
 - **Invisible capture** — during the call, a post-call LLM extraction pass reads the full transcript and enriches the contact record with name, email, company, and `context_notes` — a short running paragraph of personal details worth remembering
+- **Operator review expected** — CRM entries should be reviewed, corrected, or deleted periodically so incorrect or overly sensitive details do not linger
 - **Symmetric** — works identically for inbound and outbound calls; the number dialed on outbound is the CRM key
 - **Local SQLite database** — stored at `~/.config/amber/crm.sqlite` (configurable via `AMBER_CRM_DB_PATH`); no cloud dependency. CRM contact data stays on your machine. Note: voice audio and transcripts are processed by OpenAI Realtime (a cloud service) — see [OpenAI's privacy policy](https://openai.com/policies/privacy-policy).
 - **Private number safe** — anonymous/blocked numbers are silently skipped; no record created
@@ -106,7 +109,7 @@ Amber remembers every caller across calls and uses that memory to make every con
 Query the operator's calendar for availability or schedule a new event — all during a live call.
 
 - **Availability lookups** — free/busy slots for today, tomorrow, this week, or any specific date
-- **Event creation** — book appointments directly into the operator's calendar from a phone conversation
+- **Event creation** — book appointments directly into the operator's calendar from a phone conversation, but only after explicit confirmation
 - **Privacy by default** — callers are only told whether the operator is free or busy; event titles, names, and locations are never disclosed
 - Powered by `ical-query` — local-only, zero network latency
 
@@ -168,6 +171,8 @@ The dashboard auto-updates every 30 seconds when the watcher is running (`node s
 ## Customizing Amber (AGENT.md)
 
 All voice prompts, conversational rules, booking flow, and greetings live in [`AGENT.md`](AGENT.md). Edit this file to change how Amber behaves — no TypeScript required.
+
+Amber should be conversational and natural, but should not pretend to be a human being. If asked, it should identify itself plainly as an AI assistant.
 
 Template variables like `{{OPERATOR_NAME}}` and `{{ASSISTANT_NAME}}` are auto-replaced from your `.env` at runtime. See [UPGRADING.md](UPGRADING.md) for full details.
 

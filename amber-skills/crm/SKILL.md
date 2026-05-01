@@ -46,6 +46,7 @@ Same exact flow: lookup at start, upsert + log_interaction at end.
 - **Event details stay private.** Like the calendar skill, never disclose event details to callers.
 - **CRM context is personal.** The `context_notes` field is for Amber's internal memory, not for sharing call transcripts. Use it to inform conversation, not to recite it.
 - **PII storage.** Phone, name, email, company, context_notes are stored locally in SQLite. No network transmission, no external CRM by default.
+- **Review and correction.** Operators should periodically review, correct, or delete CRM entries so inaccurate transcript extraction or overly sensitive details do not persist.
 
 ## Security
 
