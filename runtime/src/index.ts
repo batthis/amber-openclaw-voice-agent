@@ -11,7 +11,7 @@ import { createProvider } from './providers/index.js';
 import type { IVoiceProvider } from './providers/index.js';
 import { loadSkills, registerSkills, isSkillFunction, getSkillTools, handleSkillCall, callSkillDirectly } from './skills/index.js';
 import type { HandleSkillCallDeps } from './skills/index.js';
-import { DEFAULT_OPENAI_VOICE, GATEWAY_BASE_URL, RUNTIME_PORT, getTelephonyRuntimeConfig, getVoiceProviderName } from './config.js';
+import { DEFAULT_OPENAI_VOICE, GATEWAY_BASE_URL, GATEWAY_CREDENTIAL, RUNTIME_PORT, getTelephonyRuntimeConfig, getVoiceProviderName } from './config.js';
 
 // ─── Security Helpers ───
 
@@ -118,7 +118,7 @@ const OPENAI_VOICE = DEFAULT_OPENAI_VOICE;
 
 // OpenClaw gateway for assistant brain-in-loop (Phase C2)
 const OPENCLAW_GATEWAY_URL = GATEWAY_BASE_URL;
-const OPENCLAW_GATEWAY_CREDENTIAL = process.env['OPENCLAW_' + 'GATEWAY_' + 'TOKEN'] ?? '';
+const OPENCLAW_GATEWAY_CREDENTIAL = GATEWAY_CREDENTIAL;
 
 // Security: Bridge API authentication
 const BRIDGE_CREDENTIAL = process.env['BRIDGE_' + 'API_' + 'TOKEN'] ?? '';
