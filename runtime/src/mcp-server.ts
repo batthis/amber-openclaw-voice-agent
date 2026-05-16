@@ -406,7 +406,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           return {
             content: [{
               type: 'text',
-              text: 'Outbound calling is disabled by default. Set AMBER_ENABLE_OUTBOUND_CALLS=true in the runtime environment to opt in, then restart Amber.',
+              text: 'Outbound calling is disabled because AMBER_ENABLE_OUTBOUND_CALLS=false is set. Remove it or set AMBER_ENABLE_OUTBOUND_CALLS=true, then restart Amber.',
             }],
             isError: true,
           };

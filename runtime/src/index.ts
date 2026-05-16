@@ -552,7 +552,7 @@ app.post('/call/outbound', requireAuth, async (req: Request, res: Response) => {
   try {
     if (!OUTBOUND_CALLS_ENABLED) {
       return res.status(403).json({
-        error: 'Outbound calls are disabled. Set AMBER_ENABLE_OUTBOUND_CALLS=true to opt in.',
+        error: 'Outbound calls are disabled because AMBER_ENABLE_OUTBOUND_CALLS=false is set. Remove it or set AMBER_ENABLE_OUTBOUND_CALLS=true to re-enable outbound calling.',
       });
     }
     const to = String(req.body?.to ?? '').trim();
