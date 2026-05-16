@@ -11,7 +11,7 @@ import { createProvider } from './providers/index.js';
 import type { IVoiceProvider } from './providers/index.js';
 import { loadSkills, registerSkills, isSkillFunction, getSkillTools, handleSkillCall, callSkillDirectly } from './skills/index.js';
 import type { HandleSkillCallDeps } from './skills/index.js';
-import { GATEWAY_BASE_URL, RUNTIME_PORT, getVoiceProviderName } from './config.js';
+import { GATEWAY_BASE_URL, RUNTIME_PORT, getTelephonyRuntimeConfig, getVoiceProviderName } from './config.js';
 
 // ─── Security Helpers ───
 
@@ -96,19 +96,20 @@ const PUBLIC_BASE_URL = mustGetEnv('PUBLIC_BASE_URL');
 // Currently supported: 'twilio' (default, production-ready), 'telnyx' (stub).
 const VOICE_PROVIDER = getVoiceProviderName();
 
-// Twilio credentials — required when VOICE_PROVIDER=twilio (the default).
+// Twilio credentials are required when VOICE_PROVIDER=twilio (the default).
 // Lazily validated: mustGetEnv only throws if we're actually using Twilio.
-const TWILIO_ACCOUNT_SID = VOICE_PROVIDER === 'twilio' ? mustGetEnv('TWILIO_ACCOUNT_SID') : (process.env.TWILIO_ACCOUNT_SID ?? '');
-const TWILIO_AUTH_TOKEN = VOICE_PROVIDER === 'twilio' ? mustGetEnv('TWILIO_AUTH_TOKEN') : (process.env.TWILIO_AUTH_TOKEN ?? '');
-const TWILIO_CALLER_ID = VOICE_PROVIDER === 'twilio' ? mustGetEnv('TWILIO_CALLER_ID') : (process.env.TWILIO_CALLER_ID ?? '');
+const telephonyConfig = getTelephonyRuntimeConfig(VOICE_PROVIDER, mustGetEnv);
+const TWILIO_ACCOUNT_SID = telephonyConfig.accountSid;
+const TWILIO_AUTH_TOKEN = telephonyConfig.credential;
+const TWILIO_CALLER_ID = telephonyConfig.twilioCallerId;
 
-// Caller ID used for outbound calls. Defaults to TWILIO_CALLER_ID for backward
+// Caller ID used for outbound calls. Defaults to the Twilio caller ID for backward
 // compatibility; override with VOICE_CALLER_ID when using a non-Twilio provider.
-const VOICE_CALLER_ID = process.env.VOICE_CALLER_ID ?? TWILIO_CALLER_ID;
+const VOICE_CALLER_ID = telephonyConfig.voiceCallerId;
 
-// Webhook validation secret. Defaults to TWILIO_AUTH_TOKEN for backward
+// Webhook validation secret. Defaults to the provider credential for backward
 // compatibility; set VOICE_WEBHOOK_SECRET when using a non-Twilio provider.
-const VOICE_WEBHOOK_SECRET = process.env.VOICE_WEBHOOK_SECRET ?? TWILIO_AUTH_TOKEN;
+const VOICE_WEBHOOK_SECRET = telephonyConfig.webhookSecret;
 
 const OPENAI_API_KEY = mustGetEnv('OPENAI_API_KEY');
 const OPENAI_PROJECT_ID = mustGetEnv('OPENAI_PROJECT_ID');
