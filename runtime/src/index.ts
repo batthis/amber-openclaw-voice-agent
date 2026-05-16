@@ -11,7 +11,7 @@ import { createProvider } from './providers/index.js';
 import type { IVoiceProvider } from './providers/index.js';
 import { loadSkills, registerSkills, isSkillFunction, getSkillTools, handleSkillCall, callSkillDirectly } from './skills/index.js';
 import type { HandleSkillCallDeps } from './skills/index.js';
-import { BRIDGE_CREDENTIAL as DEFAULT_BRIDGE_CREDENTIAL, DEFAULT_OPENAI_VOICE, GATEWAY_BASE_URL, GATEWAY_CREDENTIAL, IS_PRODUCTION_RUNTIME, IS_TEST_RUNTIME, PROVIDER_WEBHOOK_STRICT, RUNTIME_PORT, getPersonalizationConfig, getTelephonyRuntimeConfig, getTelnyxRuntimeConfig, getVoiceProviderName, requireRuntimeEnv } from './config.js';
+import { BRIDGE_CREDENTIAL as DEFAULT_BRIDGE_CREDENTIAL, DEFAULT_OPENAI_VOICE, GATEWAY_BASE_URL, GATEWAY_CREDENTIAL, IS_PRODUCTION_RUNTIME, IS_TEST_RUNTIME, OUTBOUND_CALLS_ENABLED, PROVIDER_WEBHOOK_STRICT, RUNTIME_PORT, getPersonalizationConfig, getTelephonyRuntimeConfig, getTelnyxRuntimeConfig, getVoiceProviderName, requireRuntimeEnv } from './config.js';
 
 // ─── Security Helpers ───
 
@@ -550,6 +550,11 @@ app.post('/twilio/inbound', validateProviderWebhook, async (req: Request, res: R
  */
 app.post('/call/outbound', requireAuth, async (req: Request, res: Response) => {
   try {
+    if (!OUTBOUND_CALLS_ENABLED) {
+      return res.status(403).json({
+        error: 'Outbound calls are disabled. Set AMBER_ENABLE_OUTBOUND_CALLS=true to opt in.',
+      });
+    }
     const to = String(req.body?.to ?? '').trim();
     if (!isE164(to)) {
       return res.status(400).json({ error: 'Invalid `to`. Expected E.164 string like +14165551234' });

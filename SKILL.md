@@ -3,7 +3,7 @@ name: amber-voice-assistant
 title: "Amber — Give Your Agent Real Phone Capabilities"
 description: "Give your OpenClaw agent real phone capabilities. Setup uses a short wizard; after setup, run calls and phone tasks with one natural-language prompt."
 homepage: https://github.com/batthis/amber-openclaw-voice-agent
-metadata: {"openclaw":{"emoji":"☎️","requires":{"env":[],"optionalEnv":["OPENCLAW_GATEWAY_URL","TWILIO_WEBHOOK_STRICT","VOICE_PROVIDER","VOICE_WEBHOOK_SECRET","ASSISTANT_NAME","OPERATOR_NAME","AMBER_CRM_DB_PATH","AGENT_MD_PATH","DEFAULT_CALENDAR"],"anyBins":["node","ical-query"]},"install":[{"id":"runtime","kind":"node","cwd":"runtime","label":"Install Amber runtime (cd runtime && npm ci && npm run build)"}]}}
+metadata: {"openclaw":{"emoji":"☎️","requires":{"env":[],"optionalEnv":["AMBER_ENABLE_OUTBOUND_CALLS","OPENCLAW_GATEWAY_URL","TWILIO_WEBHOOK_STRICT","VOICE_PROVIDER","VOICE_WEBHOOK_SECRET","ASSISTANT_NAME","OPERATOR_NAME","AMBER_CRM_DB_PATH","AGENT_MD_PATH","DEFAULT_CALENDAR"],"anyBins":["node","ical-query"]},"install":[{"id":"runtime","kind":"node","cwd":"runtime","label":"Install Amber runtime (cd runtime && npm ci && npm run build)"}]}}
 ---
 
 # Amber — Give Your Agent Real Phone Capabilities
@@ -32,7 +32,7 @@ Amber gives any OpenClaw deployment **real phone capabilities for agents**. It s
 - **Call log dashboard** (`dashboard/`) — browse call history, transcripts, and captured messages; includes **manual Sync button** to pull new calls on demand
 - **Setup & validation scripts** — preflight checks, env templates, quickstart runner
 - **Architecture docs & troubleshooting** — call flow diagrams, common failure runbooks
-- **Safety guardrails** — approval patterns for outbound calls, payment escalation, consent boundaries, and explicit confirmation for calendar writes
+- **Safety guardrails** — outbound calling is disabled by default and must be explicitly enabled; payment escalation, consent boundaries, and explicit confirmation for calendar writes are documented
 
 ## 🔌 Amber Skills — Extensible by Design
 
@@ -94,7 +94,7 @@ cd dashboard && node scripts/serve.js   # → http://localhost:8787
 
 - **Ship a voice assistant in minutes** — `npm install`, configure `.env`, `npm start`
 - Full inbound screening: greeting, message-taking, appointment booking with calendar integration
-- Outbound calls with structured call plans (reservations, inquiries, follow-ups)
+- Optional outbound calls with structured call plans (reservations, inquiries, follow-ups), disabled by default until the operator opts in
 - **OpenClaw gateway lookup (least-privilege)** — voice agent consults your OpenClaw gateway only for call-critical needs (availability checks, confirmed scheduling, required factual lookups), not for unrelated tasks
 - VAD tuning + verbal fillers to keep conversations natural (no dead air during lookups)
 - Fully configurable: assistant name, operator info, org name, calendar, screening style — all via env vars
@@ -166,6 +166,7 @@ These controls reduce blast radius if a host or config file is exposed.
 
 ## Safe defaults
 
+- Outbound calling is **disabled by default**. Set `AMBER_ENABLE_OUTBOUND_CALLS=true` only if you want Amber to place calls.
 - Require explicit approval before outbound calls. **Note on confirmation enforcement:** For MCP-initiated outbound calls (`make_call`), confirmation is enforced at the MCP server layer in code (the tool returns a preview and requires `confirmed=true` on a second call before dialing) — this is not LLM-only instruction. The LLM instruction layer provides an additional reminder, but the code gate is the primary enforcement mechanism.
 - If payment/deposit is requested, stop and escalate to the human operator.
 - Keep greeting short and clear.

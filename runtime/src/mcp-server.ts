@@ -32,6 +32,7 @@ const BRIDGE_URL = runtimeConfig.bridgeUrl;
 const BRIDGE_CREDENTIAL = runtimeConfig.bridgeCredential;
 const OPERATOR_NAME = runtimeConfig.operatorName;
 const LOGS_DIR = runtimeConfig.logsDir;
+const OUTBOUND_CALLS_ENABLED = runtimeConfig.outboundCallsEnabled;
 
 // ─── Helpers ───
 
@@ -400,6 +401,16 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     switch (name) {
       case 'make_call': {
         let { to, name: toName, objective, confirmed } = args as { to?: string; name?: string; objective: string; confirmed?: boolean };
+
+        if (!OUTBOUND_CALLS_ENABLED) {
+          return {
+            content: [{
+              type: 'text',
+              text: 'Outbound calling is disabled by default. Set AMBER_ENABLE_OUTBOUND_CALLS=true in the runtime environment to opt in, then restart Amber.',
+            }],
+            isError: true,
+          };
+        }
 
         // Resolve name → phone number via contacts cache
         if (!to && toName) {

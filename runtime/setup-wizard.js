@@ -225,6 +225,10 @@ ${c.bold}${c.cyan}╔═══════════════════�
     cfg.PUBLIC_BASE_URL = publicUrl;
   }
 
+  head('Outbound Calls (optional)');
+  info('Inbound answering and screening work without outbound calling enabled.');
+  cfg.AMBER_ENABLE_OUTBOUND_CALLS = await yesNo('Enable outbound calling? You can turn this on later.', false) ? 'true' : 'false';
+
   // ── Optional: OpenClaw ─────────────────────────────────────────────
   head('OpenClaw Gateway (optional)');
   info('If you have an OpenClaw gateway, the assistant can consult it during calls.');
@@ -285,6 +289,10 @@ ${c.bold}${c.cyan}╔═══════════════════�
     '# === Server ===',
     `PORT=${cfg.PORT}`,
     `PUBLIC_BASE_URL=${cfg.PUBLIC_BASE_URL}`,
+    '',
+    '# === Safety ===',
+    '# Outbound calling is opt-in. Set true only when you want Amber to place calls.',
+    `AMBER_ENABLE_OUTBOUND_CALLS=${cfg.AMBER_ENABLE_OUTBOUND_CALLS}`,
   ];
 
   if (cfg.OPENCLAW_GATEWAY_URL) {
