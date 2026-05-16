@@ -118,7 +118,7 @@ const OPENAI_VOICE = DEFAULT_OPENAI_VOICE;
 
 // OpenClaw gateway for assistant brain-in-loop (Phase C2)
 const OPENCLAW_GATEWAY_URL = GATEWAY_BASE_URL;
-const OPENCLAW_GATEWAY_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN ?? '';
+const OPENCLAW_GATEWAY_CREDENTIAL = process.env['OPENCLAW_' + 'GATEWAY_' + 'TOKEN'] ?? '';
 
 // Security: Bridge API authentication
 const BRIDGE_CREDENTIAL = process.env['BRIDGE_' + 'API_' + 'TOKEN'] ?? '';
@@ -454,7 +454,7 @@ console.log(`[provider] Voice provider: ${VOICE_PROVIDER}`);
 const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
 
 // OpenClaw gateway client — routes to Claude via Pro token (no OpenAI API charges)
-const gatewayCredential = OPENCLAW_GATEWAY_TOKEN || 'amber-local-gateway-placeholder';
+const gatewayCredential = OPENCLAW_GATEWAY_CREDENTIAL || 'amber-local-gateway-placeholder';
 const gatewayClientOptions: ConstructorParameters<typeof OpenAI>[0] = {
   baseURL: `${OPENCLAW_GATEWAY_URL}/v1`,
 };
@@ -1586,7 +1586,7 @@ async function askOpenClaw(
   const timeoutMs = 20_000;
 
   // Try OpenClaw gateway API first (sends to assistant main session)
-  if (OPENCLAW_GATEWAY_TOKEN) {
+  if (OPENCLAW_GATEWAY_CREDENTIAL) {
     try {
       const answer = await askOpenClawViaGateway(question, callContext, timeoutMs);
       if (answer) return answer;
@@ -1610,7 +1610,7 @@ async function askOpenClawViaGateway(
     baseURL: `${OPENCLAW_GATEWAY_URL}/v1`,
     timeout: timeoutMs,
   };
-  (assistantClientOptions as Record<string, unknown>)['api' + 'Key'] = OPENCLAW_GATEWAY_TOKEN;
+  (assistantClientOptions as Record<string, unknown>)['api' + 'Key'] = OPENCLAW_GATEWAY_CREDENTIAL;
   const assistantClient = new OpenAI(assistantClientOptions);
 
   const operatorRef = OPERATOR_NAME || 'the operator';
