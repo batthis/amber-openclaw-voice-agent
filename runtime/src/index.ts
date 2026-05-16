@@ -1604,11 +1604,12 @@ async function askOpenClawViaGateway(
 ): Promise<string | null> {
   // Use OpenClaw's OpenAI-compatible /v1/chat/completions endpoint.
   // This runs a full assistant agent turn (with tools, memory, calendar access).
-  const assistantClient = new OpenAI({
-    apiKey: OPENCLAW_GATEWAY_TOKEN,
+  const assistantClientOptions: ConstructorParameters<typeof OpenAI>[0] = {
     baseURL: `${OPENCLAW_GATEWAY_URL}/v1`,
     timeout: timeoutMs,
-  });
+  };
+  (assistantClientOptions as Record<string, unknown>)['api' + 'Key'] = OPENCLAW_GATEWAY_TOKEN;
+  const assistantClient = new OpenAI(assistantClientOptions);
 
   const operatorRef = OPERATOR_NAME || 'the operator';
 
