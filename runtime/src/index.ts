@@ -11,6 +11,7 @@ import { createProvider } from './providers/index.js';
 import type { IVoiceProvider } from './providers/index.js';
 import { loadSkills, registerSkills, isSkillFunction, getSkillTools, handleSkillCall, callSkillDirectly } from './skills/index.js';
 import type { HandleSkillCallDeps } from './skills/index.js';
+import { GATEWAY_BASE_URL, RUNTIME_PORT } from './config.js';
 
 // ─── Security Helpers ───
 
@@ -86,7 +87,7 @@ function sanitizePromptInput(text: string, maxLen = 500): string {
   return cleaned;
 }
 
-const PORT = Number(process.env.PORT ?? 8000);
+const PORT = RUNTIME_PORT;
 const PUBLIC_BASE_URL = mustGetEnv('PUBLIC_BASE_URL');
 
 // ─── Provider selection ───
@@ -115,7 +116,7 @@ const OPENAI_WEBHOOK_SECRET = mustGetEnv('OPENAI_WEBHOOK_SECRET');
 const OPENAI_VOICE = process.env.OPENAI_VOICE ?? 'alloy';
 
 // OpenClaw gateway for assistant brain-in-loop (Phase C2)
-const OPENCLAW_GATEWAY_URL = process.env.OPENCLAW_GATEWAY_URL ?? 'http://127.0.0.1:18789';
+const OPENCLAW_GATEWAY_URL = GATEWAY_BASE_URL;
 const OPENCLAW_GATEWAY_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN ?? '';
 
 // Security: Bridge API authentication

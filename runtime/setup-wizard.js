@@ -6,7 +6,6 @@ import { createInterface } from 'node:readline/promises';
 import { stdin, stdout, env } from 'node:process';
 import { existsSync, copyFileSync, writeFileSync, readFileSync } from 'node:fs';
 import { access } from 'node:fs/promises';
-import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
@@ -114,17 +113,8 @@ async function getActiveNgrokTunnel() {
 }
 
 async function startNgrok(port) {
-  info('Starting ngrok…');
-  // Security: 'ngrok' is a hardcoded binary name; port is coerced to string from a numeric config value
-  const proc = spawn('ngrok', ['http', String(port)], { stdio: 'ignore', detached: true });
-  proc.unref();
-  // wait up to 5s for tunnel
-  for (let i = 0; i < 10; i++) {
-    await new Promise(r => setTimeout(r, 500));
-    const url = await getActiveNgrokTunnel();
-    if (url) { ok(`ngrok tunnel: ${url}`); return url; }
-  }
-  warn('ngrok started but no tunnel detected yet — you may need to set PUBLIC_BASE_URL manually.');
+  info(`Open a second terminal and run: ngrok http ${String(port)}`);
+  info('Then paste the HTTPS forwarding URL below.');
   return null;
 }
 
@@ -221,8 +211,8 @@ ${c.bold}${c.cyan}╔═══════════════════�
       if (await yesNo(`Use ${tunnel} as PUBLIC_BASE_URL?`)) publicUrl = tunnel;
     } else {
       info('No active ngrok tunnel found.');
-      if (await yesNo(`Start ngrok on port ${cfg.PORT}?`)) {
-        publicUrl = await startNgrok(cfg.PORT);
+      if (await yesNo(`Show ngrok command for port ${cfg.PORT}?`)) {
+        await startNgrok(cfg.PORT);
       }
     }
   } else {
@@ -320,178 +310,28 @@ ${c.bold}${c.cyan}╔═══════════════════�
 
   // ── Post-setup ─────────────────────────────────────────────────────
   head('Post-Setup');
+  info('Configuration is complete. To keep this wizard safe and transparent, it does not run install/build commands itself.');
+  info('Run these commands next from the runtime directory:');
+  info('  npm install');
+  info('  npm run build');
 
-  if (await yesNo('Run npm install?')) {
-    // Check for native build tools — better-sqlite3 (CRM skill) requires compilation.
-    // On macOS this means Xcode CLI tools + accepted license. Warn early so the user
-    // knows what to do if npm install fails with a gyp/make error.
-    const platform = process.platform;
-    if (platform === 'darwin') {
-      try {
-        execSync('xcode-select -p', { stdio: 'pipe' });
-        // Xcode tools present — check license accepted
-        try {
-          execSync('xcodebuild -license check', { stdio: 'pipe' });
-        } catch (_) {
-          warn('Xcode license not accepted. The CRM skill (better-sqlite3) requires native compilation.');
-          warn('If npm install fails, run: sudo xcodebuild -license accept');
-        }
-      } catch (_) {
-        warn('Xcode Command Line Tools not found. The CRM skill (better-sqlite3) requires native compilation.');
-        warn('Install them first: xcode-select --install');
-      }
-    } else if (platform === 'linux') {
-      try {
-        execSync('which make && which python3', { stdio: 'pipe' });
-      } catch (_) {
-        warn('build-essential or python3 may be missing. The CRM skill requires native compilation.');
-        warn('On Debian/Ubuntu: sudo apt install build-essential python3');
-      }
-    }
-
-    const s = spinner('Installing dependencies…');
-    try {
-      // Security: hardcoded npm command, cwd scoped to this script's own directory
-      execSync('npm install', { cwd: __dirname, stdio: 'pipe' });
-      s.stop(); ok('Dependencies installed');
-    } catch (e) {
-      s.stop(); fail(`npm install failed: ${e.message}`);
-      if (platform === 'darwin') {
-        info('If the error mentions gyp or make, run: sudo xcodebuild -license accept  then retry npm install.');
-      }
-    }
-  }
-
-  if (await yesNo('Run npm run build?')) {
-    const s = spinner('Building…');
-    try {
-      // Security: hardcoded npm command, cwd scoped to this script's own directory
-      execSync('npm run build', { cwd: __dirname, stdio: 'pipe' });
-      s.stop(); ok('Build succeeded');
-    } catch (e) {
-      s.stop(); fail(`Build failed: ${e.message}`);
-    }
-  }
-
-  // ── Native Tools (macOS only) ────────────────────────────────────
   if (process.platform === 'darwin') {
     head('Native Tools (macOS)');
-    info('Amber uses native macOS tools for Calendar and Contacts access.');
-    info('These need to be compiled from Swift source (one-time).');
-
-    // Check for Swift compiler
-    let hasSwift = false;
-    try {
-      execSync('which swiftc', { stdio: 'pipe' });
-      hasSwift = true;
-      ok('Swift compiler found');
-    } catch (_) {
-      warn('Swift compiler not found. Install Xcode Command Line Tools:');
-      info('  xcode-select --install');
-      info('You can re-run setup after installing to compile native tools.');
-    }
-
-    if (hasSwift) {
-      const srcDir = resolve(__dirname, 'src');
-      const toolsDir = resolve(__dirname, '..', 'tools');
-
-      // Ensure tools directory exists
-      const { mkdirSync } = await import('node:fs');
-      try { mkdirSync(toolsDir, { recursive: true }); } catch (_) {}
-
-      // ── ical-query ──
-      const icalSrc = resolve(srcDir, 'ical-query.swift');
-      const icalBin = resolve(toolsDir, 'ical-query');
-      if (existsSync(icalSrc)) {
-        if (existsSync(icalBin)) {
-          ok('ical-query already compiled');
-        } else if (await yesNo('Compile ical-query (Calendar access)?')) {
-          const s = spinner('Compiling ical-query…');
-          try {
-            execSync(`swiftc "${icalSrc}" -o "${icalBin}" -framework EventKit -O`, { stdio: 'pipe', timeout: 60000 });
-            s.stop(); ok('ical-query compiled');
-          } catch (e) {
-            s.stop(); fail(`ical-query compilation failed: ${e.message}`);
-          }
-        }
-      } else {
-        info('ical-query source not found — skipping (Calendar features may be limited)');
-      }
-
-      // ── Grant permissions ──
-      const compiledTools = [];
-      if (existsSync(icalBin)) compiledTools.push({ name: 'ical-query', bin: icalBin, what: 'Calendar' });
-
-      if (compiledTools.length > 0) {
-        head('macOS Permissions');
-        info('macOS requires you to grant Calendar and Contacts access.');
-        info('A system dialog will appear for each — click "Allow".\n');
-
-        for (const tool of compiledTools) {
-          if (await yesNo(`Grant ${tool.what} access now?`)) {
-            try {
-              // Run a harmless query to trigger the macOS permission prompt
-              const testCmd = tool.name === 'ical-query' ? 'today' : 'search test';
-              execSync(`"${tool.bin}" ${testCmd}`, { stdio: 'pipe', timeout: 30000 });
-              ok(`${tool.what} access granted`);
-            } catch (e) {
-              const errMsg = e.stderr?.toString() || e.message || '';
-              if (errMsg.includes('denied') || errMsg.includes('Denied')) {
-                warn(`${tool.what} access was denied. Grant it manually:`);
-                info(`  System Settings → Privacy & Security → ${tool.what} → enable ${tool.name}`);
-              } else {
-                // Non-permission error — the command may have run fine but returned non-zero
-                // (e.g., no calendar events today). Check if it was actually a permission issue.
-                ok(`${tool.what} permission prompt triggered — check if you saw a dialog`);
-              }
-            }
-          }
-        }
-      }
-    }
+    info('Amber can use native macOS helpers for Calendar and Contacts access.');
+    info('If you need Calendar support, compile the helper after setup:');
+    info('  mkdir -p ../tools');
+    info('  swiftc src/ical-query.swift -o ../tools/ical-query -framework EventKit -O');
+    info('Then trigger the macOS permission dialog with:');
+    info('  ../tools/ical-query today');
   }
 
-  // ── Claude Desktop / Cowork Setup ───────────────────────────────
   head('Claude Desktop / Cowork Plugin (optional)');
-  info('Amber can also run as an MCP plugin for Claude Desktop.');
-  const isCowork = await yesNo('Are you setting up for Claude Desktop / Cowork?', false);
-
-  // ── Contacts Sync (macOS + Cowork only) ─────────────────────────
-  if (process.platform === 'darwin' && isCowork) {
-    head('Apple Contacts Sync');
-    info('Amber can look up contacts from your Apple address book.');
-    info('This exports your contacts to a local JSON cache file.');
-    info('(The cache stays on your machine — nothing is uploaded.)\n');
-
-    if (await yesNo('Sync Apple Contacts now?')) {
-      const s = spinner('Exporting contacts…');
-      try {
-        const syncScript = resolve(__dirname, 'scripts', 'sync-contacts.js');
-        execSync(`node "${syncScript}"`, { cwd: __dirname, stdio: 'pipe', timeout: 30000 });
-        s.stop();
-        const cachePath = resolve(__dirname, 'contacts-cache.json');
-        if (existsSync(cachePath)) {
-          const cache = JSON.parse(readFileSync(cachePath, 'utf8'));
-          ok(`Exported ${cache.count} contacts to contacts-cache.json`);
-        } else {
-          ok('Contacts sync completed');
-        }
-        info('To refresh later: npm run sync-contacts');
-      } catch (e) {
-        s.stop();
-        const errMsg = e.stderr?.toString() || e.message || '';
-        if (errMsg.includes('denied') || errMsg.includes('EPERM')) {
-          fail('Contacts access denied.');
-          info('Grant Full Disk Access to Terminal:');
-          info('  System Settings → Privacy & Security → Full Disk Access → enable Terminal');
-          info('Then re-run: npm run sync-contacts');
-        } else {
-          fail(`Contacts sync failed: ${e.message}`);
-        }
-      }
-    } else {
-      info('Skipped. Run later: npm run sync-contacts');
-    }
+  let isCowork = false;
+  if (await yesNo('Are you setting up for Claude Desktop / Cowork?', false)) {
+    isCowork = true;
+    info('To sync Apple Contacts after setup, run:');
+    info('  npm run sync-contacts');
+    info('The cache stays local at runtime/contacts-cache.json.');
   }
 
   // ── Summary ────────────────────────────────────────────────────────

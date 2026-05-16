@@ -21,15 +21,16 @@ import {
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { execFileSync } from 'node:child_process';
+import { getMcpRuntimeConfig } from './config.js';
 
 // ─── Configuration ───
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const BRIDGE_URL = process.env.AMBER_BRIDGE_URL ?? 'http://127.0.0.1:8000';
-const BRIDGE_API_TOKEN = process.env.BRIDGE_API_TOKEN ?? '';
-const OPERATOR_NAME = process.env.OPERATOR_NAME ?? '';
-const LOGS_DIR = process.env.AMBER_LOGS_DIR ?? path.join(__dirname, '..', 'logs');
+const runtimeConfig = getMcpRuntimeConfig(__dirname);
+const BRIDGE_URL = runtimeConfig.bridgeUrl;
+const BRIDGE_API_TOKEN = runtimeConfig.bridgeCredential;
+const OPERATOR_NAME = runtimeConfig.operatorName;
+const LOGS_DIR = runtimeConfig.logsDir;
 
 // ─── Helpers ───
 

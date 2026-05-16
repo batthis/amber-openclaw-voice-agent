@@ -3,7 +3,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { URL } = require('url');
-const { spawn } = require('child_process');
+const { processLogsWithOptions } = require('../process_logs.js');
 
 function parseArgs(argv) {
   const args = { port: 8787, host: '127.0.0.1' };
@@ -58,30 +58,17 @@ const server = http.createServer((req, res) => {
       return;
     }
     const startTime = Date.now();
-    // Scope env to minimal required vars rather than forwarding entire process.env
-    const safeEnv = {
-      HOME: process.env.HOME,
-      PATH: process.env.PATH,
-      LOGS_DIR: process.env.LOGS_DIR,
-      TWILIO_CALLER_ID: process.env.TWILIO_CALLER_ID,
-      ASSISTANT_NAME: process.env.ASSISTANT_NAME,
-      OPERATOR_NAME: process.env.OPERATOR_NAME,
-    };
-    const child = spawn(process.execPath, [processLogsPath], { env: safeEnv, timeout: 120000 });
-    let stdout = '', stderr = '';
-    child.stdout.on('data', d => { stdout += d; });
-    child.stderr.on('data', d => { stderr += d; });
-    child.on('close', code => {
-      const durationMs = Date.now() - startTime;
-      console.log(`[sync] process_logs.js exited ${code} in ${durationMs}ms`);
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ success: code === 0, exitCode: code, durationMs,
-        output: stdout.trim().split('\n').slice(-5).join('\n'), error: stderr.trim() || null }));
-    });
-    child.on('error', err => {
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ success: false, error: err.message }));
-    });
+    processLogsWithOptions({ logsDir: process.env.LOGS_DIR, outputDir: path.join(root, 'data'), writeSample: true })
+      .then(calls => {
+        const durationMs = Date.now() - startTime;
+        console.log(`[sync] processed ${calls.length} calls in ${durationMs}ms`);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, calls: calls.length, durationMs, error: null }));
+      })
+      .catch(err => {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      });
     return;
   }
 
