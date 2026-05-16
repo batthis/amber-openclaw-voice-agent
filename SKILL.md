@@ -1,7 +1,7 @@
 ---
 name: amber-voice-assistant
 title: "Amber — Give Your Agent Real Phone Capabilities"
-description: "Give your OpenClaw agent real phone capabilities: inbound answering, outbound calls, booking, screening, CRM memory, and real-world phone task execution."
+description: "Give your OpenClaw agent real phone capabilities. Setup uses a short wizard; after setup, run calls and phone tasks with one natural-language prompt."
 homepage: https://github.com/batthis/amber-openclaw-voice-agent
 metadata: {"openclaw":{"emoji":"☎️","requires":{"env":["TWILIO_ACCOUNT_SID","TWILIO_AUTH_TOKEN","TWILIO_CALLER_ID","OPENAI_API_KEY","OPENAI_PROJECT_ID","OPENAI_WEBHOOK_SECRET","PUBLIC_BASE_URL"],"optionalEnv":["OPENCLAW_GATEWAY_URL","OPENCLAW_GATEWAY_TOKEN","BRIDGE_API_TOKEN","TWILIO_WEBHOOK_STRICT","VOICE_PROVIDER","VOICE_WEBHOOK_SECRET","ASSISTANT_NAME","OPERATOR_NAME","AMBER_CRM_DB_PATH","AGENT_MD_PATH","DEFAULT_CALENDAR"],"anyBins":["node","ical-query","bash"]},"primaryEnv":"OPENAI_API_KEY","install":[{"id":"runtime","kind":"node","cwd":"runtime","label":"Install Amber runtime (cd runtime && npm ci && npm run build)"}]}}
 ---
@@ -14,7 +14,7 @@ Amber gives any OpenClaw deployment **real phone capabilities for agents**. It s
 
 **✨ New in v5.4.0:** Amber now ships as a **Claude Desktop MCP plugin** with 9 tools — make outbound calls by name, check call history, query CRM contacts, manage calendar, and control call screening, all from Claude Desktop or Claude Cowork. Includes Apple Contacts integration and a call confirmation safeguard to prevent wrong-number dials.
 
-**✨ Also:** Interactive setup wizard (`npm run setup`) validates credentials in real-time and generates a working `.env` file — no manual configuration needed!
+**✨ Also:** Interactive setup wizard (`npm run setup`) validates credentials in real-time and generates a working `.env` file — no manual configuration needed. Once setup is complete, Amber is prompt-based: ask your OpenClaw agent to make calls, answer/screen callers, book appointments, or handle phone tasks in natural language.
 
 ## See it in action
 
