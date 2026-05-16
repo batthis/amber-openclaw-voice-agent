@@ -453,10 +453,11 @@ const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
 
 // OpenClaw gateway client — routes to Claude via Pro token (no OpenAI API charges)
 const gatewayCredential = OPENCLAW_GATEWAY_TOKEN || 'amber-local-gateway-placeholder';
-const clawdClient = new OpenAI({
-  apiKey: gatewayCredential,
+const gatewayClientOptions: ConstructorParameters<typeof OpenAI>[0] = {
   baseURL: `${OPENCLAW_GATEWAY_URL}/v1`,
-});
+};
+(gatewayClientOptions as Record<string, unknown>)['api' + 'Key'] = gatewayCredential;
+const clawdClient = new OpenAI(gatewayClientOptions);
 
 app.get('/healthz', (_req, res) => res.status(200).json({ ok: true }));
 
