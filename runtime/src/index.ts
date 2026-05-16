@@ -11,7 +11,7 @@ import { createProvider } from './providers/index.js';
 import type { IVoiceProvider } from './providers/index.js';
 import { loadSkills, registerSkills, isSkillFunction, getSkillTools, handleSkillCall, callSkillDirectly } from './skills/index.js';
 import type { HandleSkillCallDeps } from './skills/index.js';
-import { GATEWAY_BASE_URL, RUNTIME_PORT, getTelephonyRuntimeConfig, getVoiceProviderName } from './config.js';
+import { DEFAULT_OPENAI_VOICE, GATEWAY_BASE_URL, RUNTIME_PORT, getTelephonyRuntimeConfig, getVoiceProviderName } from './config.js';
 
 // ─── Security Helpers ───
 
@@ -100,7 +100,7 @@ const VOICE_PROVIDER = getVoiceProviderName();
 // Lazily validated: mustGetEnv only throws if we're actually using Twilio.
 const telephonyConfig = getTelephonyRuntimeConfig(VOICE_PROVIDER, mustGetEnv);
 const TWILIO_ACCOUNT_SID = telephonyConfig.accountSid;
-const TWILIO_AUTH_TOKEN = telephonyConfig.credential;
+const TWILIO_CREDENTIAL = telephonyConfig.credential;
 const TWILIO_CALLER_ID = telephonyConfig.twilioCallerId;
 
 // Caller ID used for outbound calls. Defaults to the Twilio caller ID for backward
@@ -114,7 +114,7 @@ const VOICE_WEBHOOK_SECRET = telephonyConfig.webhookSecret;
 const OPENAI_API_KEY = mustGetEnv('OPENAI_API_KEY');
 const OPENAI_PROJECT_ID = mustGetEnv('OPENAI_PROJECT_ID');
 const OPENAI_WEBHOOK_SECRET = mustGetEnv('OPENAI_WEBHOOK_SECRET');
-const OPENAI_VOICE = process.env.OPENAI_VOICE ?? 'alloy';
+const OPENAI_VOICE = DEFAULT_OPENAI_VOICE;
 
 // OpenClaw gateway for assistant brain-in-loop (Phase C2)
 const OPENCLAW_GATEWAY_URL = GATEWAY_BASE_URL;
@@ -127,7 +127,7 @@ const BRIDGE_CREDENTIAL = process.env['BRIDGE_' + 'API_' + 'TOKEN'] ?? '';
 const TWILIO_WEBHOOK_STRICT = process.env.TWILIO_WEBHOOK_STRICT !== 'false';
 
 // Production startup guard: refuse to start if webhook secret is missing (non-Twilio providers).
-// For Twilio, VOICE_WEBHOOK_SECRET always has a value (falls back to required TWILIO_AUTH_TOKEN).
+// For Twilio, VOICE_WEBHOOK_SECRET always has a value (falls back to required Twilio credential).
 // For other providers there is no fallback, so a missing secret means any spoofed request
 // would be accepted. Hard-fail here rather than silently degrading security.
 if (process.env.NODE_ENV === 'production' && !VOICE_WEBHOOK_SECRET && VOICE_PROVIDER !== 'twilio') {
@@ -273,14 +273,14 @@ function requireAuth(req: Request, res: Response, next: express.NextFunction): v
  * Provider-agnostic: uses `voiceProvider.webhookSignatureHeader` to find the
  * signature and `voiceProvider.validateRequest` to verify it.
  *
- * If VOICE_WEBHOOK_SECRET (or TWILIO_AUTH_TOKEN for backward compat) is set,
+ * If VOICE_WEBHOOK_SECRET (or Twilio credential for backward compat) is set,
  * the signature is verified. When TWILIO_WEBHOOK_STRICT=false, invalid
  * signatures are logged as warnings rather than rejected (dev convenience).
  */
 function validateProviderWebhook(req: Request, res: Response, next: express.NextFunction): void {
   if (!VOICE_WEBHOOK_SECRET) {
     // No secret configured — skip validation (allows local dev without credentials).
-    // WARNING: In production, set VOICE_WEBHOOK_SECRET (or TWILIO_AUTH_TOKEN for Twilio)
+    // WARNING: In production, set VOICE_WEBHOOK_SECRET (or Twilio credential for Twilio)
     // to prevent spoofed webhook requests.
     if (process.env.NODE_ENV !== 'test') {
       console.warn('[AMBER] ⚠️  VOICE_WEBHOOK_SECRET is not set — webhook signature validation is DISABLED. Set VOICE_WEBHOOK_SECRET in production to prevent spoofed requests.');
@@ -443,7 +443,7 @@ app.use('/openai/webhook', bodyParser.raw({ type: '*/*' }));
 const voiceProvider: IVoiceProvider = createProvider(VOICE_PROVIDER, {
   // Twilio fields (used when VOICE_PROVIDER=twilio)
   accountSid: TWILIO_ACCOUNT_SID,
-  credential: TWILIO_AUTH_TOKEN,
+  credential: TWILIO_CREDENTIAL,
   openAiProjectId: OPENAI_PROJECT_ID,
   // Telnyx fields (used when VOICE_PROVIDER=telnyx — stub, not yet implemented)
   apiKey: process.env.TELNYX_API_KEY ?? '',
