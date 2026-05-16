@@ -3,18 +3,18 @@ name: amber-voice-assistant
 title: "Amber — Give Your Agent Real Phone Capabilities"
 description: "Give your OpenClaw agent real phone capabilities. Setup uses a short wizard; after setup, run calls and phone tasks with one natural-language prompt."
 homepage: https://github.com/batthis/amber-openclaw-voice-agent
-metadata: {"openclaw":{"emoji":"☎️","requires":{"env":["TWILIO_ACCOUNT_SID","TWILIO_AUTH_TOKEN","TWILIO_CALLER_ID","OPENAI_API_KEY","OPENAI_PROJECT_ID","OPENAI_WEBHOOK_SECRET","PUBLIC_BASE_URL"],"optionalEnv":["OPENCLAW_GATEWAY_URL","OPENCLAW_GATEWAY_TOKEN","BRIDGE_API_TOKEN","TWILIO_WEBHOOK_STRICT","VOICE_PROVIDER","VOICE_WEBHOOK_SECRET","ASSISTANT_NAME","OPERATOR_NAME","AMBER_CRM_DB_PATH","AGENT_MD_PATH","DEFAULT_CALENDAR"],"anyBins":["node","ical-query","bash"]},"primaryEnv":"OPENAI_API_KEY","install":[{"id":"runtime","kind":"node","cwd":"runtime","label":"Install Amber runtime (cd runtime && npm ci && npm run build)"}]}}
+metadata: {"openclaw":{"emoji":"☎️","requires":{"env":["TWILIO_ACCOUNT_SID","TWILIO_AUTH_TOKEN","TWILIO_CALLER_ID","OPENAI_API_KEY","OPENAI_PROJECT_ID","OPENAI_WEBHOOK_SECRET","PUBLIC_BASE_URL"],"optionalEnv":["OPENCLAW_GATEWAY_URL","TWILIO_WEBHOOK_STRICT","VOICE_PROVIDER","VOICE_WEBHOOK_SECRET","ASSISTANT_NAME","OPERATOR_NAME","AMBER_CRM_DB_PATH","AGENT_MD_PATH","DEFAULT_CALENDAR"],"anyBins":["node","ical-query"]},"primaryEnv":"OPENAI_API_KEY","install":[{"id":"runtime","kind":"node","cwd":"runtime","label":"Install Amber runtime (cd runtime && npm ci && npm run build)"}]}}
 ---
 
 # Amber — Give Your Agent Real Phone Capabilities
 
 ## Overview
 
-Amber gives any OpenClaw deployment **real phone capabilities for agents**. It ships with a **production-ready Twilio + OpenAI Realtime bridge** (`runtime/`) that lets your OpenClaw agent answer inbound calls, make outbound calls, book appointments, screen callers, and complete real-world phone tasks via natural voice conversation over a real telephone number.
+Amber gives any OpenClaw deployment **real phone capabilities for agents**. It ships with a **production-ready Twilio + OpenAI Realtime bridge** (`runtime/`) for operator-confirmed phone workflows: inbound answering, call screening, outbound dialing, and calendar scheduling over a real telephone number.
 
-**✨ New in v5.4.0:** Amber now ships as a **Claude Desktop MCP plugin** with 9 tools — make outbound calls by name, check call history, query CRM contacts, manage calendar, and control call screening, all from Claude Desktop or Claude Cowork. Includes Apple Contacts integration and a call confirmation safeguard to prevent wrong-number dials.
+**✨ New in v5.4.0:** Amber now ships as a **Claude Desktop MCP plugin** with 9 tools — prepare confirmed calls by name, check call history, query CRM contacts, manage calendar, and control call screening, all from Claude Desktop or Claude Cowork. Includes Apple Contacts integration and a code-enforced call confirmation safeguard to prevent wrong-number dials.
 
-**✨ Also:** Interactive setup wizard (`npm run setup`) validates credentials in real-time and generates a working `.env` file — no manual configuration needed. Once setup is complete, Amber is prompt-based: ask your OpenClaw agent to make calls, answer/screen callers, book appointments, or handle phone tasks in natural language.
+**✨ Also:** Interactive setup wizard (`npm run setup`) validates credentials in real-time and generates a working `.env` file — no manual configuration needed. Once setup is complete, Amber is prompt-based: ask your OpenClaw agent to prepare confirmed calls, answer/screen callers, schedule confirmed appointments, or handle phone workflows in natural language.
 
 ## See it in action
 
@@ -43,8 +43,8 @@ Amber ships with a growing library of **Amber Skills** — modular capabilities 
 Amber remembers every caller across calls and uses that memory to personalize every conversation.
 
 - **Runtime-managed** — lookup and logging happen automatically; Amber never has to "remember" to call CRM
-- **Personalized greeting** — known callers are greeted by name; personal context (pets, recent events, preferences) is referenced warmly on the first sentence
-- **Two-pass enrichment** — auto-log captures the call immediately; a post-call LLM extraction pass reads the full transcript to extract name, email, and `context_notes`
+- **Personalized greeting** — known callers can be greeted by name; optional notes are used only when relevant to the call objective
+- **Two-pass enrichment** — auto-log captures the call immediately; an optional post-call extraction pass proposes caller details and notes for the local CRM
 - **Operator review expected** — review, correct, or delete CRM records periodically so bad transcript extraction or misleading caller input does not persist indefinitely
 - **Symmetric** — works identically for inbound and outbound calls
 - **Local SQLite CRM** — contact memory is stored at `~/.config/amber/crm.sqlite`; CRM records are not cloud-hosted. Live call audio/transcripts still pass through Twilio/OpenAI as part of the phone bridge.
@@ -55,7 +55,7 @@ Amber remembers every caller across calls and uses that memory to personalize ev
 Query the operator's calendar for availability or schedule a new event — all during a live call.
 
 - **Availability lookups** — free/busy slots for today, tomorrow, this week, or any specific date
-- **Event creation** — book appointments directly into the operator's calendar from a phone conversation, but only after explicit caller confirmation
+- **Event creation** — create calendar events from a phone conversation only after the required details are collected and the caller explicitly confirms the slot
 - **Privacy by default** — callers are only told whether the operator is free or busy; event titles, names, and locations are never disclosed
 - Powered by `ical-query` — local-only, zero network latency
 
@@ -95,7 +95,7 @@ cd dashboard && node scripts/serve.js   # → http://localhost:8787
 - **Ship a voice assistant in minutes** — `npm install`, configure `.env`, `npm start`
 - Full inbound screening: greeting, message-taking, appointment booking with calendar integration
 - Outbound calls with structured call plans (reservations, inquiries, follow-ups)
-- **`ask_openclaw` tool (least-privilege)** — voice agent consults your OpenClaw gateway only for call-critical needs (calendar checks, booking, required factual lookups), not for unrelated tasks
+- **OpenClaw gateway lookup (least-privilege)** — voice agent consults your OpenClaw gateway only for call-critical needs (availability checks, confirmed scheduling, required factual lookups), not for unrelated tasks
 - VAD tuning + verbal fillers to keep conversations natural (no dead air during lookups)
 - Fully configurable: assistant name, operator info, org name, calendar, screening style — all via env vars
 - Operator safety guardrails for approvals/escalation/payment handling
