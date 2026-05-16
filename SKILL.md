@@ -47,7 +47,7 @@ Amber remembers every caller across calls and uses that memory to personalize ev
 - **Two-pass enrichment** — auto-log captures the call immediately; a post-call LLM extraction pass reads the full transcript to extract name, email, and `context_notes`
 - **Operator review expected** — review, correct, or delete CRM records periodically so bad transcript extraction or misleading caller input does not persist indefinitely
 - **Symmetric** — works identically for inbound and outbound calls
-- **Local SQLite** — stored at `~/.config/amber/crm.sqlite`; no cloud, no data leaves your machine
+- **Local SQLite CRM** — contact memory is stored at `~/.config/amber/crm.sqlite`; CRM records are not cloud-hosted. Live call audio/transcripts still pass through Twilio/OpenAI as part of the phone bridge.
 - **Native dependency** — requires `better-sqlite3` (native build). macOS: `sudo xcodebuild -license accept` before `npm install`. Linux: `build-essential` + `python3`.
 
 ### 📅 Calendar

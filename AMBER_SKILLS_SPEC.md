@@ -207,7 +207,7 @@ The router rejects any `act` skill call where `confirmed !== true` unless the sk
 - Include `confirmed` as a required boolean parameter in `function_schema.parameters`
 - The function description should also prompt the model to confirm with the caller first, as an
   additional layer — but the router enforcement is the authoritative gate, not the model prompt
-- This puts confirmation in the LLM layer, not the router layer (simpler, reliable enough for V1)
+- Confirmation is therefore enforced in code at the router layer; the LLM prompt is only a user-experience cue.
 
 ### 4. api.ts
 
