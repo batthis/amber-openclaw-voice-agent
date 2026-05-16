@@ -5,7 +5,8 @@
 import { createInterface } from 'node:readline/promises';
 import { stdin, stdout, env } from 'node:process';
 import { existsSync, copyFileSync, writeFileSync, readFileSync } from 'node:fs';
-import { execSync, spawn } from 'node:child_process';
+import { access } from 'node:fs/promises';
+import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
@@ -91,9 +92,15 @@ async function validateOpenAI(key) {
   }
 }
 
-function detectNgrok() {
-  // Security: hardcoded command, no user input involved
-  try { execSync('which ngrok', { stdio: 'pipe' }); return true; } catch { return false; }
+async function detectNgrok() {
+  const pathDirs = (env.PATH || '').split(':').filter(Boolean);
+  for (const dir of pathDirs) {
+    try {
+      await access(resolve(dir, 'ngrok'));
+      return true;
+    } catch {}
+  }
+  return false;
 }
 
 async function getActiveNgrokTunnel() {
@@ -203,7 +210,7 @@ ${c.bold}${c.cyan}╔═══════════════════�
   cfg.PORT = await ask('Port', '8000');
 
   // ngrok detection
-  const ngrokInstalled = detectNgrok();
+  const ngrokInstalled = await detectNgrok();
   let publicUrl = null;
 
   if (ngrokInstalled) {

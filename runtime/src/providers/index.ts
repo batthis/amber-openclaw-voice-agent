@@ -46,7 +46,7 @@ type SupportedProvider = (typeof SUPPORTED_PROVIDERS)[number];
  * @example
  *   const provider = createProvider('twilio', {
  *     accountSid: process.env.TWILIO_ACCOUNT_SID!,
- *     authToken:  process.env.TWILIO_AUTH_TOKEN!,
+ *     credential: process.env.TWILIO_AUTH_TOKEN!,
  *     openAiProjectId: process.env.OPENAI_PROJECT_ID!,
  *   });
  */

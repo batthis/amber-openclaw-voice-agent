@@ -441,7 +441,7 @@ app.use('/openai/webhook', bodyParser.raw({ type: '*/*' }));
 const voiceProvider: IVoiceProvider = createProvider(VOICE_PROVIDER, {
   // Twilio fields (used when VOICE_PROVIDER=twilio)
   accountSid: TWILIO_ACCOUNT_SID,
-  authToken: TWILIO_AUTH_TOKEN,
+  credential: TWILIO_AUTH_TOKEN,
   openAiProjectId: OPENAI_PROJECT_ID,
   // Telnyx fields (used when VOICE_PROVIDER=telnyx — stub, not yet implemented)
   apiKey: process.env.TELNYX_API_KEY ?? '',
