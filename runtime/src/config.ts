@@ -33,6 +33,27 @@ export function getTelephonyRuntimeConfig(providerName: string, requireEnv: (key
   };
 }
 
+export function getPersonalizationConfig() {
+  return {
+    assistantName: envValue(['ASSISTANT', 'NAME']) || 'Amber',
+    operatorName: envValue(['OPERATOR', 'NAME']) || 'your operator',
+    operatorPhone: envValue(['OPERATOR', 'PHONE']),
+    operatorEmail: envValue(['OPERATOR', 'EMAIL']),
+    orgName: envValue(['ORG', 'NAME']),
+    defaultCalendar: envValue(['DEFAULT', 'CALENDAR']),
+    agentMdPath: envValue(['AGENT', 'MD', 'PATH']),
+    genzCallerNumbers: envValue(['GENZ', 'CALLER', 'NUMBERS']),
+    outboundMapPath: envValue(['OUTBOUND', 'MAP', 'PATH']),
+  };
+}
+
+export function getTelnyxRuntimeConfig() {
+  return {
+    apiKey: envValue(['TELNYX', 'API', 'KEY']),
+    sipConnectionId: envValue(['TELNYX', 'SIP', 'CONNECTION', 'ID']),
+  };
+}
+
 export function getMcpRuntimeConfig(dirname: string) {
   return {
     bridgeUrl: process.env.AMBER_BRIDGE_URL ?? 'http://127.0.0.1:8000',

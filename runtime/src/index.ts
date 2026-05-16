@@ -11,7 +11,7 @@ import { createProvider } from './providers/index.js';
 import type { IVoiceProvider } from './providers/index.js';
 import { loadSkills, registerSkills, isSkillFunction, getSkillTools, handleSkillCall, callSkillDirectly } from './skills/index.js';
 import type { HandleSkillCallDeps } from './skills/index.js';
-import { BRIDGE_CREDENTIAL as DEFAULT_BRIDGE_CREDENTIAL, DEFAULT_OPENAI_VOICE, GATEWAY_BASE_URL, GATEWAY_CREDENTIAL, IS_PRODUCTION_RUNTIME, IS_TEST_RUNTIME, PROVIDER_WEBHOOK_STRICT, RUNTIME_PORT, getTelephonyRuntimeConfig, getVoiceProviderName } from './config.js';
+import { BRIDGE_CREDENTIAL as DEFAULT_BRIDGE_CREDENTIAL, DEFAULT_OPENAI_VOICE, GATEWAY_BASE_URL, GATEWAY_CREDENTIAL, IS_PRODUCTION_RUNTIME, IS_TEST_RUNTIME, PROVIDER_WEBHOOK_STRICT, RUNTIME_PORT, getPersonalizationConfig, getTelephonyRuntimeConfig, getTelnyxRuntimeConfig, getVoiceProviderName } from './config.js';
 
 // ─── Security Helpers ───
 
@@ -139,12 +139,13 @@ if (IS_PRODUCTION_RUNTIME && !VOICE_WEBHOOK_SECRET && VOICE_PROVIDER !== 'twilio
 }
 
 // Configurable operator/assistant info (sanitized to prevent prompt injection)
-const ASSISTANT_NAME = sanitizeEnvName(process.env.ASSISTANT_NAME ?? 'Amber');
-const OPERATOR_NAME = sanitizeEnvName(process.env.OPERATOR_NAME ?? 'your operator');
-const OPERATOR_PHONE = process.env.OPERATOR_PHONE ?? '';
-const OPERATOR_EMAIL = process.env.OPERATOR_EMAIL ?? '';
-const ORG_NAME = process.env.ORG_NAME ?? '';
-const DEFAULT_CALENDAR = process.env.DEFAULT_CALENDAR ?? '';
+const personalizationConfig = getPersonalizationConfig();
+const ASSISTANT_NAME = sanitizeEnvName(personalizationConfig.assistantName);
+const OPERATOR_NAME = sanitizeEnvName(personalizationConfig.operatorName);
+const OPERATOR_PHONE = personalizationConfig.operatorPhone;
+const OPERATOR_EMAIL = personalizationConfig.operatorEmail;
+const ORG_NAME = personalizationConfig.orgName;
+const DEFAULT_CALENDAR = personalizationConfig.defaultCalendar;
 
 // ─── AGENT.md Loader ───
 
@@ -162,7 +163,7 @@ function loadAgentMd(): AgentSections | null {
   //   3. Must not contain null bytes (defence against null-byte injection)
   // Falls back to the default AGENT.md if validation fails.
   let agentPath = defaultAgentPath;
-  const envPath = process.env.AGENT_MD_PATH;
+  const envPath = personalizationConfig.agentMdPath;
   if (envPath) {
     const resolved = path.resolve(envPath);
     if (resolved.includes('\0') || !resolved.endsWith('.md')) {
@@ -215,11 +216,11 @@ function getAgentSection(heading: string): string | null {
 }
 
 // Configurable GenZ caller numbers (comma-separated E.164 numbers)
-const GENZ_NUMBERS = (process.env.GENZ_CALLER_NUMBERS ?? '').split(',').map(s => s.trim()).filter(Boolean);
+const GENZ_NUMBERS = personalizationConfig.genzCallerNumbers.split(',').map(s => s.trim()).filter(Boolean);
 
 // Configurable outbound map path (validated to prevent path traversal)
 const OUTBOUND_MAP_PATH = (() => {
-  const userPath = process.env.OUTBOUND_MAP_PATH;
+  const userPath = personalizationConfig.outboundMapPath;
   const defaultPath = path.join(process.cwd(), 'data', 'bridge-outbound-map.json');
   
   if (!userPath) return defaultPath;
@@ -440,14 +441,15 @@ app.use('/openai/webhook', bodyParser.raw({ type: '*/*' }));
 // ─── Voice provider (Twilio by default) ─────────────────────────────────────
 // Instantiated once at startup. All telephony operations go through this.
 // Switch providers by setting VOICE_PROVIDER in .env.
+const telnyxConfig = getTelnyxRuntimeConfig();
 const voiceProvider: IVoiceProvider = createProvider(VOICE_PROVIDER, {
   // Twilio fields (used when VOICE_PROVIDER=twilio)
   accountSid: TWILIO_ACCOUNT_SID,
   credential: TWILIO_CREDENTIAL,
   openAiProjectId: OPENAI_PROJECT_ID,
   // Telnyx fields (used when VOICE_PROVIDER=telnyx — stub, not yet implemented)
-  apiKey: process.env.TELNYX_API_KEY ?? '',
-  sipConnectionId: process.env.TELNYX_SIP_CONNECTION_ID ?? '',
+  apiKey: telnyxConfig.apiKey,
+  sipConnectionId: telnyxConfig.sipConnectionId,
 });
 console.log(`[provider] Voice provider: ${VOICE_PROVIDER}`);
 
