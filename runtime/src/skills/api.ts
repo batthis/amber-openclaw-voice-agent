@@ -5,7 +5,7 @@
  * enforced based on the skill's manifest.
  */
 
-import { execFileSync } from 'child_process';
+import { spawnSync } from 'node:child_process';
 import { AmberSkillPermissions, SkillCallContext } from './types.js';
 import OpenAI from 'openai';
 
@@ -41,8 +41,8 @@ export function buildSkillContext(
      * Execute a local binary. Only binaries listed in permissions.local_binaries are allowed.
      *
      * cmd must be a string[] — e.g. ['/usr/local/bin/ical-query', 'today'].
-     * Uses execFileSync: no shell is spawned, arguments are passed as discrete tokens,
-     * immune to shell injection regardless of argument content.
+     * Uses spawnSync with shell disabled: arguments are passed as discrete tokens,
+     * avoiding shell interpolation regardless of argument content.
      */
     exec: async (cmd: string[]): Promise<string> => {
       if (!Array.isArray(cmd) || cmd.length === 0) {
@@ -57,7 +57,10 @@ export function buildSkillContext(
       }
 
       try {
-        return execFileSync(file, args, { encoding: 'utf8', timeout: 10000 }).trim();
+        const result = spawnSync(file, args, { encoding: 'utf8', timeout: 10000, shell: false, maxBuffer: 1024 * 1024 });
+        if (result.error) throw result.error;
+        if (result.status !== 0) throw new Error(result.stderr || `helper exited with status ${result.status}`);
+        return String(result.stdout || '').trim();
       } catch (e: any) {
         throw new Error(`exec failed: ${e.message || e}`);
       }

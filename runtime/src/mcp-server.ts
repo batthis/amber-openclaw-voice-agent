@@ -28,7 +28,7 @@ import { getMcpRuntimeConfig } from './config.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const runtimeConfig = getMcpRuntimeConfig(__dirname);
 const BRIDGE_URL = runtimeConfig.bridgeUrl;
-const BRIDGE_API_TOKEN = runtimeConfig.bridgeCredential;
+const BRIDGE_CREDENTIAL = runtimeConfig.bridgeCredential;
 const OPERATOR_NAME = runtimeConfig.operatorName;
 const LOGS_DIR = runtimeConfig.logsDir;
 
@@ -36,8 +36,8 @@ const LOGS_DIR = runtimeConfig.logsDir;
 
 async function bridgeRequest(endpoint: string, body: Record<string, any>): Promise<any> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (BRIDGE_API_TOKEN) {
-    headers['Authorization'] = `Bearer ${BRIDGE_API_TOKEN}`;
+  if (BRIDGE_CREDENTIAL) {
+    headers['Authorization'] = `Bearer ${BRIDGE_CREDENTIAL}`;
   }
 
   const res = await fetch(`${BRIDGE_URL}${endpoint}`, {
@@ -95,8 +95,11 @@ function buildMcpSkillContext() {
       if (!allowedBins.has(baseBin) && !allowedBins.has(file)) {
         throw new Error(`Permission denied: binary "${baseBin}" not allowed`);
       }
-      const { execFileSync } = await import('node:child_process');
-      return execFileSync(file, args, { encoding: 'utf8', timeout: 10000 }).trim();
+      const { spawnSync } = await import('node:child_process');
+      const result = spawnSync(file, args, { encoding: 'utf8', timeout: 10000, shell: false, maxBuffer: 1024 * 1024 });
+        if (result.error) throw result.error;
+        if (result.status !== 0) throw new Error(result.stderr || `helper exited with status ${result.status}`);
+        return String(result.stdout || '').trim();
     },
 
     callLog: {

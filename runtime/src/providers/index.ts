@@ -3,7 +3,7 @@
  *
  * Usage:
  *   import { createProvider } from './providers/index.js';
- *   const provider = createProvider(process.env.VOICE_PROVIDER ?? 'twilio', config);
+ *   const provider = createProvider(getVoiceProviderName(), config);
  *
  * Supported providers:
  *   'twilio'  — Default. Full implementation. Production-ready.

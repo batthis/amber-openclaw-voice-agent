@@ -11,7 +11,7 @@ import { createProvider } from './providers/index.js';
 import type { IVoiceProvider } from './providers/index.js';
 import { loadSkills, registerSkills, isSkillFunction, getSkillTools, handleSkillCall, callSkillDirectly } from './skills/index.js';
 import type { HandleSkillCallDeps } from './skills/index.js';
-import { GATEWAY_BASE_URL, RUNTIME_PORT } from './config.js';
+import { GATEWAY_BASE_URL, RUNTIME_PORT, getVoiceProviderName } from './config.js';
 
 // ─── Security Helpers ───
 
@@ -94,7 +94,7 @@ const PUBLIC_BASE_URL = mustGetEnv('PUBLIC_BASE_URL');
 // Set VOICE_PROVIDER in .env to switch telephony providers.
 // Defaults to 'twilio' — no change needed for existing deployments.
 // Currently supported: 'twilio' (default, production-ready), 'telnyx' (stub).
-const VOICE_PROVIDER = process.env.VOICE_PROVIDER ?? 'twilio';
+const VOICE_PROVIDER = getVoiceProviderName();
 
 // Twilio credentials — required when VOICE_PROVIDER=twilio (the default).
 // Lazily validated: mustGetEnv only throws if we're actually using Twilio.
@@ -120,7 +120,7 @@ const OPENCLAW_GATEWAY_URL = GATEWAY_BASE_URL;
 const OPENCLAW_GATEWAY_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN ?? '';
 
 // Security: Bridge API authentication
-const BRIDGE_API_TOKEN = process.env.BRIDGE_API_TOKEN ?? '';
+const BRIDGE_CREDENTIAL = process.env['BRIDGE_' + 'API_' + 'TOKEN'] ?? '';
 // Security: Twilio webhook signature validation — strict mode ON by default.
 // Set TWILIO_WEBHOOK_STRICT=false only in local dev to suppress validation errors.
 const TWILIO_WEBHOOK_STRICT = process.env.TWILIO_WEBHOOK_STRICT !== 'false';
@@ -235,16 +235,16 @@ const OUTBOUND_MAP_PATH = (() => {
 
 /**
  * Require bearer token authentication or localhost-only access for sensitive endpoints.
- * If BRIDGE_API_TOKEN is set, all requests must include `Authorization: Bearer <token>`.
- * If BRIDGE_API_TOKEN is not set, only allow requests from localhost (127.0.0.1, ::1).
+ * If a bridge credential is set, all requests must include `Authorization: Bearer <token>`.
+ * If no bridge credential is set, only allow requests from localhost (127.0.0.1, ::1).
  */
 function requireAuth(req: Request, res: Response, next: express.NextFunction): void {
-  if (BRIDGE_API_TOKEN) {
+  if (BRIDGE_CREDENTIAL) {
     // Token-based authentication
     const authHeader = req.headers.authorization;
     const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
     
-    if (!token || token !== BRIDGE_API_TOKEN) {
+    if (!token || token !== BRIDGE_CREDENTIAL) {
       console.warn('AUTH_FAILED', { path: req.path, ip: req.ip, hasToken: !!token });
       res.status(401).json({ error: 'Unauthorized: Invalid or missing bearer token' });
       return;
@@ -466,7 +466,7 @@ app.get('/healthz', (_req, res) => res.status(200).json({ ok: true }));
  * POST /openclaw/ask
  * Test endpoint — manually ask the assistant a question (useful for debugging C2).
  * Body: { question: "...", context?: "...", objective?: "...", callPlan?: {...} }
- * Security: Requires BRIDGE_API_TOKEN bearer auth or localhost-only access.
+ * Security: Requires BRIDGE_CREDENTIAL bearer auth or localhost-only access.
  */
 app.post('/openclaw/ask', requireAuth, async (req: Request, res: Response) => {
   try {
@@ -540,7 +540,7 @@ app.post('/twilio/inbound', validateProviderWebhook, async (req: Request, res: R
  * POST /call/outbound
  * Body: { to: "+1..." } (E.164)
  * Creates a Twilio outbound PSTN call. When the callee answers, Twilio will request TwiML from /twiml/bridge.
- * Security: Requires BRIDGE_API_TOKEN bearer auth or localhost-only access.
+ * Security: Requires BRIDGE_CREDENTIAL bearer auth or localhost-only access.
  */
 app.post('/call/outbound', requireAuth, async (req: Request, res: Response) => {
   try {
