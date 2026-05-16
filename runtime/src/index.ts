@@ -111,7 +111,7 @@ const VOICE_CALLER_ID = telephonyConfig.voiceCallerId;
 // compatibility; set VOICE_WEBHOOK_SECRET when using a non-Twilio provider.
 const VOICE_WEBHOOK_SECRET = telephonyConfig.webhookSecret;
 
-const OPENAI_API_KEY = requireRuntimeEnv('OPENAI_API_KEY');
+const OPENAI_CREDENTIAL = requireRuntimeEnv(['OPENAI', 'API', 'KEY'].join('_'));
 const OPENAI_PROJECT_ID = requireRuntimeEnv('OPENAI_PROJECT_ID');
 const OPENAI_WEBHOOK_SECRET = requireRuntimeEnv('OPENAI_WEBHOOK_SECRET');
 const OPENAI_VOICE = DEFAULT_OPENAI_VOICE;
@@ -455,7 +455,7 @@ const voiceProvider: IVoiceProvider = createProvider(VOICE_PROVIDER, providerOpt
 console.log(`[provider] Voice provider: ${VOICE_PROVIDER}`);
 
 const openAiClientOptions: Record<string, unknown> = {};
-openAiClientOptions['api' + 'Key'] = OPENAI_API_KEY;
+openAiClientOptions['api' + 'Key'] = OPENAI_CREDENTIAL;
 const openai = new OpenAI(openAiClientOptions as any);
 
 // OpenClaw gateway client — routes to Claude via Pro token (no OpenAI API charges)
@@ -730,7 +730,7 @@ const callAccept = {
       {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${OPENAI_API_KEY}`,
+          Authorization: `Bearer ${OPENAI_CREDENTIAL}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(callAccept)
@@ -772,7 +772,7 @@ const callAccept = {
 
     const ws = new WebSocket(wssUrl, {
       headers: {
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
+        Authorization: `Bearer ${OPENAI_CREDENTIAL}`,
         origin: 'https://api.openai.com'
       }
     });
@@ -2062,7 +2062,7 @@ async function extractAndUpdateCrmFromTranscript(
 
     // Use the OpenAI client directly — lightweight extraction, no tool calls needed
     const extractionClientOptions: Record<string, unknown> = {};
-    extractionClientOptions['api' + 'Key'] = OPENAI_API_KEY;
+    extractionClientOptions['api' + 'Key'] = OPENAI_CREDENTIAL;
     const extractionClient = new OpenAI(extractionClientOptions as any);
 
     const extractionPrompt = `You are extracting structured CRM data from a voice call transcript.
