@@ -226,8 +226,8 @@ ${c.bold}${c.cyan}╔═══════════════════�
   }
 
   head('Outbound Calls (optional)');
-  info('Inbound answering and screening work without outbound calling enabled.');
-  cfg.AMBER_ENABLE_OUTBOUND_CALLS = await yesNo('Enable outbound calling? You can turn this on later.', false) ? 'true' : 'false';
+  info('Outbound calling is enabled by default for the full Amber experience. You can disable it later.');
+  cfg.AMBER_ENABLE_OUTBOUND_CALLS = await yesNo('Enable outbound calling?', true) ? 'true' : 'false';
 
   // ── Optional: OpenClaw ─────────────────────────────────────────────
   head('OpenClaw Gateway (optional)');
@@ -291,7 +291,7 @@ ${c.bold}${c.cyan}╔═══════════════════�
     `PUBLIC_BASE_URL=${cfg.PUBLIC_BASE_URL}`,
     '',
     '# === Safety ===',
-    '# Outbound calling is opt-in. Set true only when you want Amber to place calls.',
+    '# Outbound calling defaults to enabled. Set false to disable the outbound call endpoint.',
     `AMBER_ENABLE_OUTBOUND_CALLS=${cfg.AMBER_ENABLE_OUTBOUND_CALLS}`,
   ];
 

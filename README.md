@@ -17,7 +17,7 @@ Amber is not just a standalone voice bot or virtual receptionist. It operates as
 - 👤 **Built-in CRM** — remembers every caller across calls; greets by name, references personal context naturally, with operator review/correction responsibility
 - 📊 **Call log dashboard** — browse history, transcripts, captured messages, follow-up tracking
 - ⚡ **Launch in minutes** — `npm install`, configure `.env`, `npm start`
-- 🔒 **Safety guardrails** — outbound calling is disabled by default, with operator approval/confirmation when enabled; payment escalation and consent boundaries included
+- 🔒 **Safety guardrails** — outbound calls use operator approval/confirmation gates and can be disabled with `AMBER_ENABLE_OUTBOUND_CALLS=false`; payment escalation and consent boundaries included
 - 🎛️ **Fully configurable** — assistant name, operator info, org name, voice, screening style
 - 📝 **AGENT.md** — customize all prompts, greetings, booking flow, and personality in a single editable markdown file (no code changes needed)
 

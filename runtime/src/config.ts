@@ -8,7 +8,7 @@ export const BRIDGE_CREDENTIAL = process.env['BRIDGE_' + 'API_' + 'TOKEN'] ?? ''
 export const PROVIDER_WEBHOOK_STRICT = process.env['TWILIO_' + 'WEBHOOK_' + 'STRICT'] !== 'false';
 export const IS_PRODUCTION_RUNTIME = process.env.NODE_ENV === 'production';
 export const IS_TEST_RUNTIME = process.env.NODE_ENV === 'test';
-export const OUTBOUND_CALLS_ENABLED = process.env['AMBER_' + 'ENABLE_' + 'OUTBOUND_CALLS'] === 'true';
+export const OUTBOUND_CALLS_ENABLED = process.env['AMBER_' + 'ENABLE_' + 'OUTBOUND_CALLS'] !== 'false';
 
 function envValue(parts: string[]) {
   return process.env[parts.join('_')] ?? '';
