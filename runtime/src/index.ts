@@ -11,7 +11,7 @@ import { createProvider } from './providers/index.js';
 import type { IVoiceProvider } from './providers/index.js';
 import { loadSkills, registerSkills, isSkillFunction, getSkillTools, handleSkillCall, callSkillDirectly } from './skills/index.js';
 import type { HandleSkillCallDeps } from './skills/index.js';
-import { BRIDGE_CREDENTIAL as DEFAULT_BRIDGE_CREDENTIAL, DEFAULT_OPENAI_VOICE, GATEWAY_BASE_URL, GATEWAY_CREDENTIAL, RUNTIME_PORT, getTelephonyRuntimeConfig, getVoiceProviderName } from './config.js';
+import { BRIDGE_CREDENTIAL as DEFAULT_BRIDGE_CREDENTIAL, DEFAULT_OPENAI_VOICE, GATEWAY_BASE_URL, GATEWAY_CREDENTIAL, PROVIDER_WEBHOOK_STRICT, RUNTIME_PORT, getTelephonyRuntimeConfig, getVoiceProviderName } from './config.js';
 
 // ─── Security Helpers ───
 
@@ -124,7 +124,7 @@ const OPENCLAW_GATEWAY_CREDENTIAL = GATEWAY_CREDENTIAL;
 const BRIDGE_CREDENTIAL = DEFAULT_BRIDGE_CREDENTIAL;
 // Security: Twilio webhook signature validation — strict mode ON by default.
 // Set TWILIO_WEBHOOK_STRICT=false only in local dev to suppress validation errors.
-const TWILIO_WEBHOOK_STRICT = process.env.TWILIO_WEBHOOK_STRICT !== 'false';
+const TWILIO_WEBHOOK_STRICT = PROVIDER_WEBHOOK_STRICT;
 
 // Production startup guard: refuse to start if webhook secret is missing (non-Twilio providers).
 // For Twilio, VOICE_WEBHOOK_SECRET always has a value (falls back to required Twilio credential).
