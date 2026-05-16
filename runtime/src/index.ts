@@ -11,7 +11,7 @@ import { createProvider } from './providers/index.js';
 import type { IVoiceProvider } from './providers/index.js';
 import { loadSkills, registerSkills, isSkillFunction, getSkillTools, handleSkillCall, callSkillDirectly } from './skills/index.js';
 import type { HandleSkillCallDeps } from './skills/index.js';
-import { DEFAULT_OPENAI_VOICE, GATEWAY_BASE_URL, GATEWAY_CREDENTIAL, RUNTIME_PORT, getTelephonyRuntimeConfig, getVoiceProviderName } from './config.js';
+import { BRIDGE_CREDENTIAL as DEFAULT_BRIDGE_CREDENTIAL, DEFAULT_OPENAI_VOICE, GATEWAY_BASE_URL, GATEWAY_CREDENTIAL, RUNTIME_PORT, getTelephonyRuntimeConfig, getVoiceProviderName } from './config.js';
 
 // ─── Security Helpers ───
 
@@ -121,7 +121,7 @@ const OPENCLAW_GATEWAY_URL = GATEWAY_BASE_URL;
 const OPENCLAW_GATEWAY_CREDENTIAL = GATEWAY_CREDENTIAL;
 
 // Security: Bridge API authentication
-const BRIDGE_CREDENTIAL = process.env['BRIDGE_' + 'API_' + 'TOKEN'] ?? '';
+const BRIDGE_CREDENTIAL = DEFAULT_BRIDGE_CREDENTIAL;
 // Security: Twilio webhook signature validation — strict mode ON by default.
 // Set TWILIO_WEBHOOK_STRICT=false only in local dev to suppress validation errors.
 const TWILIO_WEBHOOK_STRICT = process.env.TWILIO_WEBHOOK_STRICT !== 'false';
