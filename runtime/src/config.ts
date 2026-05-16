@@ -13,6 +13,12 @@ function envValue(parts: string[]) {
   return process.env[parts.join('_')] ?? '';
 }
 
+export function requireRuntimeEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) throw new Error(`Missing required env var: ${name}`);
+  return value;
+}
+
 export function getVoiceProviderName() {
   return process.env['VOICE_' + 'PROVIDER'] ?? 'twilio';
 }

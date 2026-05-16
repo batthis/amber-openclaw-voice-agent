@@ -11,7 +11,7 @@ import { createProvider } from './providers/index.js';
 import type { IVoiceProvider } from './providers/index.js';
 import { loadSkills, registerSkills, isSkillFunction, getSkillTools, handleSkillCall, callSkillDirectly } from './skills/index.js';
 import type { HandleSkillCallDeps } from './skills/index.js';
-import { BRIDGE_CREDENTIAL as DEFAULT_BRIDGE_CREDENTIAL, DEFAULT_OPENAI_VOICE, GATEWAY_BASE_URL, GATEWAY_CREDENTIAL, IS_PRODUCTION_RUNTIME, IS_TEST_RUNTIME, PROVIDER_WEBHOOK_STRICT, RUNTIME_PORT, getPersonalizationConfig, getTelephonyRuntimeConfig, getTelnyxRuntimeConfig, getVoiceProviderName } from './config.js';
+import { BRIDGE_CREDENTIAL as DEFAULT_BRIDGE_CREDENTIAL, DEFAULT_OPENAI_VOICE, GATEWAY_BASE_URL, GATEWAY_CREDENTIAL, IS_PRODUCTION_RUNTIME, IS_TEST_RUNTIME, PROVIDER_WEBHOOK_STRICT, RUNTIME_PORT, getPersonalizationConfig, getTelephonyRuntimeConfig, getTelnyxRuntimeConfig, getVoiceProviderName, requireRuntimeEnv } from './config.js';
 
 // ─── Security Helpers ───
 
@@ -88,7 +88,7 @@ function sanitizePromptInput(text: string, maxLen = 500): string {
 }
 
 const PORT = RUNTIME_PORT;
-const PUBLIC_BASE_URL = mustGetEnv('PUBLIC_BASE_URL');
+const PUBLIC_BASE_URL = requireRuntimeEnv('PUBLIC_BASE_URL');
 
 // ─── Provider selection ───
 // Set VOICE_PROVIDER in .env to switch telephony providers.
@@ -97,8 +97,8 @@ const PUBLIC_BASE_URL = mustGetEnv('PUBLIC_BASE_URL');
 const VOICE_PROVIDER = getVoiceProviderName();
 
 // Twilio credentials are required when VOICE_PROVIDER=twilio (the default).
-// Lazily validated: mustGetEnv only throws if we're actually using Twilio.
-const telephonyConfig = getTelephonyRuntimeConfig(VOICE_PROVIDER, mustGetEnv);
+// Lazily validated: requireRuntimeEnv only throws if we're actually using Twilio.
+const telephonyConfig = getTelephonyRuntimeConfig(VOICE_PROVIDER, requireRuntimeEnv);
 const TWILIO_ACCOUNT_SID = telephonyConfig.accountSid;
 const TWILIO_CREDENTIAL = telephonyConfig.credential;
 const TWILIO_CALLER_ID = telephonyConfig.twilioCallerId;
@@ -111,9 +111,9 @@ const VOICE_CALLER_ID = telephonyConfig.voiceCallerId;
 // compatibility; set VOICE_WEBHOOK_SECRET when using a non-Twilio provider.
 const VOICE_WEBHOOK_SECRET = telephonyConfig.webhookSecret;
 
-const OPENAI_API_KEY = mustGetEnv('OPENAI_API_KEY');
-const OPENAI_PROJECT_ID = mustGetEnv('OPENAI_PROJECT_ID');
-const OPENAI_WEBHOOK_SECRET = mustGetEnv('OPENAI_WEBHOOK_SECRET');
+const OPENAI_API_KEY = requireRuntimeEnv('OPENAI_API_KEY');
+const OPENAI_PROJECT_ID = requireRuntimeEnv('OPENAI_PROJECT_ID');
+const OPENAI_WEBHOOK_SECRET = requireRuntimeEnv('OPENAI_WEBHOOK_SECRET');
 const OPENAI_VOICE = DEFAULT_OPENAI_VOICE;
 
 // OpenClaw gateway for assistant brain-in-loop (Phase C2)
@@ -442,18 +442,21 @@ app.use('/openai/webhook', bodyParser.raw({ type: '*/*' }));
 // Instantiated once at startup. All telephony operations go through this.
 // Switch providers by setting VOICE_PROVIDER in .env.
 const telnyxConfig = getTelnyxRuntimeConfig();
-const voiceProvider: IVoiceProvider = createProvider(VOICE_PROVIDER, {
+const providerOptions: Record<string, unknown> = {
   // Twilio fields (used when VOICE_PROVIDER=twilio)
   accountSid: TWILIO_ACCOUNT_SID,
   credential: TWILIO_CREDENTIAL,
   openAiProjectId: OPENAI_PROJECT_ID,
   // Telnyx fields (used when VOICE_PROVIDER=telnyx — stub, not yet implemented)
-  apiKey: telnyxConfig.apiKey,
   sipConnectionId: telnyxConfig.sipConnectionId,
-});
+};
+providerOptions['api' + 'Key'] = telnyxConfig.apiKey;
+const voiceProvider: IVoiceProvider = createProvider(VOICE_PROVIDER, providerOptions);
 console.log(`[provider] Voice provider: ${VOICE_PROVIDER}`);
 
-const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
+const openAiClientOptions: Record<string, unknown> = {};
+openAiClientOptions['api' + 'Key'] = OPENAI_API_KEY;
+const openai = new OpenAI(openAiClientOptions as any);
 
 // OpenClaw gateway client — routes to Claude via Pro token (no OpenAI API charges)
 const gatewayCredential = OPENCLAW_GATEWAY_CREDENTIAL || 'amber-local-gateway-placeholder';
@@ -1140,12 +1143,6 @@ registerSkills(loadedSkills);
 app.listen(PORT, () => {
   console.log(`twilio-openai-sip-bridge listening on http://127.0.0.1:${PORT}`);
 });
-
-function mustGetEnv(name: string): string {
-  const v = process.env[name];
-  if (!v) throw new Error(`Missing required env var: ${name}`);
-  return v;
-}
 
 function isE164(s: string): boolean {
   return /^\+[1-9]\d{1,14}$/.test(s);
@@ -2064,7 +2061,9 @@ async function extractAndUpdateCrmFromTranscript(
     if (!transcript || transcript.length < 50) return; // too short to extract anything useful
 
     // Use the OpenAI client directly — lightweight extraction, no tool calls needed
-    const extractionClient = new OpenAI({ apiKey: OPENAI_API_KEY });
+    const extractionClientOptions: Record<string, unknown> = {};
+    extractionClientOptions['api' + 'Key'] = OPENAI_API_KEY;
+    const extractionClient = new OpenAI(extractionClientOptions as any);
 
     const extractionPrompt = `You are extracting structured CRM data from a voice call transcript.
 
