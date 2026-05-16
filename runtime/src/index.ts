@@ -11,7 +11,7 @@ import { createProvider } from './providers/index.js';
 import type { IVoiceProvider } from './providers/index.js';
 import { loadSkills, registerSkills, isSkillFunction, getSkillTools, handleSkillCall, callSkillDirectly } from './skills/index.js';
 import type { HandleSkillCallDeps } from './skills/index.js';
-import { BRIDGE_CREDENTIAL as DEFAULT_BRIDGE_CREDENTIAL, DEFAULT_OPENAI_VOICE, GATEWAY_BASE_URL, GATEWAY_CREDENTIAL, PROVIDER_WEBHOOK_STRICT, RUNTIME_PORT, getTelephonyRuntimeConfig, getVoiceProviderName } from './config.js';
+import { BRIDGE_CREDENTIAL as DEFAULT_BRIDGE_CREDENTIAL, DEFAULT_OPENAI_VOICE, GATEWAY_BASE_URL, GATEWAY_CREDENTIAL, IS_PRODUCTION_RUNTIME, IS_TEST_RUNTIME, PROVIDER_WEBHOOK_STRICT, RUNTIME_PORT, getTelephonyRuntimeConfig, getVoiceProviderName } from './config.js';
 
 // ─── Security Helpers ───
 
@@ -130,7 +130,7 @@ const TWILIO_WEBHOOK_STRICT = PROVIDER_WEBHOOK_STRICT;
 // For Twilio, VOICE_WEBHOOK_SECRET always has a value (falls back to required Twilio credential).
 // For other providers there is no fallback, so a missing secret means any spoofed request
 // would be accepted. Hard-fail here rather than silently degrading security.
-if (process.env.NODE_ENV === 'production' && !VOICE_WEBHOOK_SECRET && VOICE_PROVIDER !== 'twilio') {
+if (IS_PRODUCTION_RUNTIME && !VOICE_WEBHOOK_SECRET && VOICE_PROVIDER !== 'twilio') {
   throw new Error(
     'FATAL: VOICE_WEBHOOK_SECRET must be set in production when VOICE_PROVIDER is not "twilio". ' +
     'Without it, webhook signature validation is disabled and spoofed requests will be accepted. ' +
@@ -282,7 +282,7 @@ function validateProviderWebhook(req: Request, res: Response, next: express.Next
     // No secret configured — skip validation (allows local dev without credentials).
     // WARNING: In production, set VOICE_WEBHOOK_SECRET (or Twilio credential for Twilio)
     // to prevent spoofed webhook requests.
-    if (process.env.NODE_ENV !== 'test') {
+    if (!IS_TEST_RUNTIME) {
       console.warn('[AMBER] ⚠️  VOICE_WEBHOOK_SECRET is not set — webhook signature validation is DISABLED. Set VOICE_WEBHOOK_SECRET in production to prevent spoofed requests.');
     }
     return next();
