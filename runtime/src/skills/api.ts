@@ -5,9 +5,9 @@
  * enforced based on the skill's manifest.
  */
 
-import { spawnSync } from 'node:child_process';
 import { AmberSkillPermissions, SkillCallContext } from './types.js';
 import OpenAI from 'openai';
+import { runLocalHelper } from '../local-helper-runner.js';
 
 export interface ApiDependencies {
   /** OpenClaw gateway client (OpenAI-compatible) */
@@ -41,8 +41,8 @@ export function buildSkillContext(
      * Execute a local binary. Only binaries listed in permissions.local_binaries are allowed.
      *
      * cmd must be a string[] — e.g. ['/usr/local/bin/ical-query', 'today'].
-     * Uses spawnSync with shell disabled: arguments are passed as discrete tokens,
-     * avoiding shell interpolation regardless of argument content.
+     * Uses the shared local-helper runner with shell disabled: arguments are passed
+     * as discrete tokens, avoiding shell interpolation regardless of content.
      */
     exec: async (cmd: string[]): Promise<string> => {
       if (!Array.isArray(cmd) || cmd.length === 0) {
@@ -57,10 +57,7 @@ export function buildSkillContext(
       }
 
       try {
-        const result = spawnSync(file, args, { encoding: 'utf8', timeout: 10000, shell: false, maxBuffer: 1024 * 1024 });
-        if (result.error) throw result.error;
-        if (result.status !== 0) throw new Error(result.stderr || `helper exited with status ${result.status}`);
-        return String(result.stdout || '').trim();
+        return await runLocalHelper(file, args);
       } catch (e: any) {
         throw new Error(`exec failed: ${e.message || e}`);
       }

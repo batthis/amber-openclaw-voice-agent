@@ -22,6 +22,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { getMcpRuntimeConfig } from './config.js';
+import { runLocalHelper } from './local-helper-runner.js';
 
 // ─── Configuration ───
 
@@ -95,11 +96,7 @@ function buildMcpSkillContext() {
       if (!allowedBins.has(baseBin) && !allowedBins.has(file)) {
         throw new Error(`Permission denied: binary "${baseBin}" not allowed`);
       }
-      const { spawnSync } = await import('node:child_process');
-      const result = spawnSync(file, args, { encoding: 'utf8', timeout: 10000, shell: false, maxBuffer: 1024 * 1024 });
-        if (result.error) throw result.error;
-        if (result.status !== 0) throw new Error(result.stderr || `helper exited with status ${result.status}`);
-        return String(result.stdout || '').trim();
+      return runLocalHelper(file, args);
     },
 
     callLog: {
