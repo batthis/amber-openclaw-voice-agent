@@ -1027,7 +1027,7 @@ const callAccept = {
           ws.send(JSON.stringify(fillerMsg));
           writeJsonl({ type: 'c2.filler_sent', call_id: callId, received_at: new Date().toISOString(), filler: fillerInstruction });
 
-          handleAskOpenClaw(ws, callId, itemId, fnCallId, fnArgs, outboundObjective, outboundCallPlan, transcriptStream, writeJsonl);
+          handleGatewayLookup(ws, callId, itemId, fnCallId, fnArgs, outboundObjective, outboundCallPlan, transcriptStream, writeJsonl);
         } else if (isSkillFunction(fnName)) {
           // Route to Amber Skills system
           const skillDeps: HandleSkillCallDeps = {
@@ -1459,7 +1459,7 @@ function buildSilenceFollowup(args: { mode: 'inbound' | 'outbound' }): string {
 
 // ─── Phase C2: Function call handlers ───
 
-async function handleAskOpenClaw(
+async function handleGatewayLookup(
   ws: WebSocket,
   callId: string,
   itemId: string,

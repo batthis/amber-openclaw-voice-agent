@@ -43,7 +43,7 @@ This means safety-critical actions (e.g., sending messages) cannot be invoked by
 - Tools are defined in `OPENCLAW_TOOLS` array (line ~313) — currently just `ask_openclaw`
 - Tools registered with OpenAI Realtime session at line ~665 and ~749
 - Function calls handled at line ~862+ — currently only `ask_openclaw` is recognized
-- `ask_openclaw` dispatches to `handleAskOpenClaw()` which calls OpenClaw gateway
+- Gateway lookups are routed through Amber's call-scoped OpenClaw bridge helper
 - Calendar lookups currently go through `ask_openclaw` → OpenClaw gateway → Jarvis → ical-query
 - A `clawdClient` (OpenAI-compatible, pointed at OpenClaw gateway) exists at module level (~line 413)
 - `sendFunctionCallOutput(ws, fnCallId, result)` sends function results back to Realtime API

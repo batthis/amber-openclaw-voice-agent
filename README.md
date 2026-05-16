@@ -33,7 +33,7 @@ Addressed scanner feedback around instruction scope and credential handling:
 
 ### v5.3.0 — CRM Skill (Feb 2026)
 
-Amber now has memory. Every call — inbound or outbound — is automatically logged to a local SQLite contact database. Callers are greeted by name. Personal context (pet names, recent events, preferences) is captured post-call by an LLM extraction pass and used to personalize future conversations. No configuration required — it works out of the box.
+Amber includes optional local caller memory. Call metadata can be saved to a local SQLite database so known callers may be greeted by name, and a post-call extraction pass can propose contact notes for operator review. The database stays local, can be corrected or deleted by the operator, and should be treated as an operator-managed convenience feature rather than an authoritative record.
 
 See [CRM skill docs](#-crm--contact-memory) below for details.
 
@@ -53,7 +53,7 @@ Point your Twilio voice webhook to `https://<your-domain>/twilio/inbound` — do
 
 ## ♻️ Runtime Management — Staying Current After Recompilation
 
-**Important:** Amber's runtime is a long-running Node.js process. It loads `dist/` once at startup. If you recompile (e.g. after a `git pull` and `npm run build`), **the running process will not pick up the changes automatically** — you must restart it.
+**Important:** Amber's runtime loads `dist/` once at startup. If you recompile (e.g. after a `git pull` and `npm run build`), **restart the runtime** so the new build is used.
 
 ```bash
 # macOS LaunchAgent (recommended)
@@ -65,7 +65,7 @@ kill $(pgrep -f 'dist/index.js') && sleep 2 && node dist/index.js
 
 ### Automatic Restart (Optional, for Persistent Deployments)
 
-Amber includes a `dist-watcher` script that runs in the background and automatically restarts the runtime whenever `dist/` files are newer than the running process. This prevents the "stale runtime" problem entirely.
+Amber includes an optional local `dist-watcher` helper for development deployments. If you intentionally enable it, it checks whether `dist/` is newer than the running process and restarts the runtime so development builds do not go stale.
 
 Only enable this if you intentionally want Amber to keep running in the background.
 
@@ -93,7 +93,7 @@ Amber remembers every caller across calls and uses that memory to make every con
 
 - **Automatic lookup** — at the start of every inbound and outbound call, the runtime looks up the caller by phone number before Amber speaks a single word
 - **Personalized greeting** — if the caller is known, Amber opens with their name and naturally references any personal context ("Hey Abe, how's Max doing?")
-- **Invisible capture** — during the call, a post-call LLM extraction pass reads the full transcript and enriches the contact record with name, email, company, and `context_notes` — a short running paragraph of personal details worth remembering
+- **Operator-reviewed notes** — after a call, an optional extraction pass can propose caller details and notes for the local contact record; operators should review, correct, or delete these records as needed
 - **Operator review expected** — CRM entries should be reviewed, corrected, or deleted periodically so incorrect or overly sensitive details do not linger
 - **Symmetric** — works identically for inbound and outbound calls; the number dialed on outbound is the CRM key
 - **Local SQLite database** — stored at `~/.config/amber/crm.sqlite` (configurable via `AMBER_CRM_DB_PATH`); no cloud dependency. CRM contact data stays on your machine. Note: voice audio and transcripts are processed by OpenAI Realtime (a cloud service) — see [OpenAI's privacy policy](https://openai.com/policies/privacy-policy).
