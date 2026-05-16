@@ -67,7 +67,7 @@ kill $(pgrep -f 'dist/index.js') && sleep 2 && node dist/index.js
 
 Amber includes an optional local `dist-watcher` helper for development deployments. If you intentionally enable it, it checks whether `dist/` is newer than the running process and restarts the runtime so development builds do not go stale.
 
-Only enable this if you intentionally want Amber to keep running in the background.
+Only enable this helper for intentional persistent deployments; otherwise run Amber manually with `npm start`.
 
 To enable it, register the provided LaunchAgent:
 
@@ -91,12 +91,12 @@ Three skills are included out of the box:
 
 Amber remembers every caller across calls and uses that memory to make every conversation feel personal.
 
-- **Automatic lookup** — at the start of every inbound and outbound call, the runtime looks up the caller by phone number before Amber speaks a single word
+- **Known-caller lookup** — when local CRM is enabled, the runtime can check whether the caller already has an operator-reviewed contact record
 - **Personalized greeting** — if the caller is known, Amber opens with their name and naturally references any personal context ("Hey Abe, how's Max doing?")
 - **Operator-reviewed notes** — after a call, an optional extraction pass can propose caller details and notes for the local contact record; operators should review, correct, or delete these records as needed
 - **Operator review expected** — CRM entries should be reviewed, corrected, or deleted periodically so incorrect or overly sensitive details do not linger
 - **Symmetric** — works identically for inbound and outbound calls; the number dialed on outbound is the CRM key
-- **Local SQLite database** — stored at `~/.config/amber/crm.sqlite` (configurable via `AMBER_CRM_DB_PATH`); no cloud dependency. CRM contact data stays on your machine. Note: voice audio and transcripts are processed by OpenAI Realtime (a cloud service) — see [OpenAI's privacy policy](https://openai.com/policies/privacy-policy).
+- **Local SQLite database** — stored at `~/.config/amber/crm.sqlite` (configurable via `AMBER_CRM_DB_PATH`); no cloud database dependency. CRM records stay on your machine. Note: voice audio and transcripts are processed by OpenAI Realtime (a cloud service) — see [OpenAI's privacy policy](https://openai.com/policies/privacy-policy).
 - **Private number safe** — anonymous/blocked numbers are silently skipped; no record created
 - **Backfill-ready** — point the post-call extractor at old transcripts to prime the CRM from day one
 
