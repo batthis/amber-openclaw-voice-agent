@@ -11,7 +11,7 @@ import { createProvider } from './providers/index.js';
 import type { IVoiceProvider } from './providers/index.js';
 import { loadSkills, registerSkills, isSkillFunction, getSkillTools, handleSkillCall, callSkillDirectly } from './skills/index.js';
 import type { HandleSkillCallDeps } from './skills/index.js';
-import { BRIDGE_CREDENTIAL as DEFAULT_BRIDGE_CREDENTIAL, DEFAULT_OPENAI_VOICE, GATEWAY_BASE_URL, GATEWAY_CREDENTIAL, IS_PRODUCTION_RUNTIME, IS_TEST_RUNTIME, OUTBOUND_CALLS_ENABLED, PROVIDER_WEBHOOK_STRICT, RUNTIME_PORT, getPersonalizationConfig, getTelephonyRuntimeConfig, getTelnyxRuntimeConfig, getVoiceProviderName, requireRuntimeEnv } from './config.js';
+import { BRIDGE_CREDENTIAL as DEFAULT_BRIDGE_CREDENTIAL, DEFAULT_OPENAI_VOICE, GATEWAY_BASE_URL, GATEWAY_CREDENTIAL, IS_PRODUCTION_RUNTIME, IS_TEST_RUNTIME, OUTBOUND_CALLS_ENABLED, PROVIDER_WEBHOOK_STRICT, REALTIME_INTERRUPT_RESPONSE, REALTIME_NOISE_REDUCTION, RUNTIME_PORT, getPersonalizationConfig, getTelephonyRuntimeConfig, getTelnyxRuntimeConfig, getVoiceProviderName, requireRuntimeEnv } from './config.js';
 
 // ─── Security Helpers ───
 
@@ -812,13 +812,20 @@ const callAccept = {
         const sessionUpdate = {
           type: 'session.update',
           session: {
+            type: 'realtime',
             tools: getAllTools(),
             tool_choice: 'auto',
-            turn_detection: {
-              type: 'server_vad',
-              threshold: 0.99,
-              prefix_padding_ms: 500,
-              silence_duration_ms: 800,
+            audio: {
+              input: {
+                noise_reduction: { type: REALTIME_NOISE_REDUCTION },
+                turn_detection: {
+                  type: 'server_vad',
+                  threshold: 0.99,
+                  prefix_padding_ms: 500,
+                  silence_duration_ms: 800,
+                  interrupt_response: REALTIME_INTERRUPT_RESPONSE,
+                },
+              },
             },
           },
         };
