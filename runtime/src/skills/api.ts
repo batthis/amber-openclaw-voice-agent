@@ -41,7 +41,8 @@ export function buildSkillContext(
      * Execute a local binary. Only binaries listed in permissions.local_binaries are allowed.
      *
      * cmd must be a string[] — e.g. ['/usr/local/bin/ical-query', 'today'].
-     * Uses the shared local-helper runner with shell disabled: arguments are passed
+     * Uses the shared local-helper runner with shell disabled and the same
+     * allowlist enforced at the process-launch boundary. Arguments are passed
      * as discrete tokens, avoiding shell interpolation regardless of content.
      */
     exec: async (cmd: string[]): Promise<string> => {
@@ -57,7 +58,7 @@ export function buildSkillContext(
       }
 
       try {
-        return await runLocalHelper(file, args);
+        return await runLocalHelper(file, args, { allowedBinaries: [...allowedBins] });
       } catch (e: any) {
         throw new Error(`exec failed: ${e.message || e}`);
       }

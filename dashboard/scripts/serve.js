@@ -38,12 +38,30 @@ if (args.help) {
 
 const root = path.resolve(__dirname, '..');
 
-const server = http.createServer((req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+function isAllowedOrigin(origin) {
+  if (!origin) return false;
+  try {
+    const u = new URL(origin);
+    return ['127.0.0.1', 'localhost', '::1', '[::1]'].includes(u.hostname);
+  } catch (_) {
+    return false;
+  }
+}
 
-  if (req.method === 'OPTIONS') { res.writeHead(200); res.end(); return; }
+const server = http.createServer((req, res) => {
+  const origin = req.headers.origin;
+  if (isAllowedOrigin(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  }
+
+  if (req.method === 'OPTIONS') {
+    res.writeHead(isAllowedOrigin(origin) ? 204 : 403);
+    res.end();
+    return;
+  }
 
   // POST /api/sync — manually trigger process_logs.js
   // Security: target script path is hardcoded (not user-controlled); no user input is

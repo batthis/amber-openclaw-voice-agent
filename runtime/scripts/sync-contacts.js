@@ -13,7 +13,10 @@
  * string interpolation used is for constructing file paths, not SQL queries.
  *
  * Purpose: Enables Amber to call people by name ("call Abe") by resolving
- * names to phone numbers locally, without any cloud lookup.
+ * names to phone numbers locally, without any cloud lookup. By default the
+ * cache includes only names and phone numbers. Set AMBER_CONTACTS_EXTENDED=true
+ * to include extra local-only fields such as email, organization, notes,
+ * relationships, job titles, and addresses.
  */
 
 'use strict';
@@ -21,6 +24,8 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+
+const includeExtendedFields = /^(1|true|yes)$/i.test(process.env.AMBER_CONTACTS_EXTENDED || '');
 
 // Resolve better-sqlite3 relative to this script's location (runtime/scripts/ → runtime/node_modules/)
 const Database = require(path.join(__dirname, '..', 'node_modules', 'better-sqlite3'));
@@ -91,10 +96,12 @@ for (const dbPath of dbPaths) {
         mergeMap.set(mergeKey, contact);
       }
 
-      if (!contact.nickname && r.ZNICKNAME) contact.nickname = r.ZNICKNAME;
-      if (!contact.organization && r.ZORGANIZATION) contact.organization = r.ZORGANIZATION;
-      if (!contact.jobTitle && r.ZJOBTITLE) contact.jobTitle = r.ZJOBTITLE;
-      if (!contact.note && r.ZNOTE) contact.note = r.ZNOTE;
+      if (includeExtendedFields) {
+        if (!contact.nickname && r.ZNICKNAME) contact.nickname = r.ZNICKNAME;
+        if (!contact.organization && r.ZORGANIZATION) contact.organization = r.ZORGANIZATION;
+        if (!contact.jobTitle && r.ZJOBTITLE) contact.jobTitle = r.ZJOBTITLE;
+        if (!contact.note && r.ZNOTE) contact.note = r.ZNOTE;
+      }
 
       for (const p of phoneStmt.all(r.Z_PK)) {
         const num = p.ZFULLNUMBER.trim();
@@ -105,30 +112,32 @@ for (const dbPath of dbPaths) {
         }
       }
 
-      for (const e of emailStmt.all(r.Z_PK)) {
-        const addr = e.ZADDRESS.toLowerCase();
-        if (!contact._seenEmails.has(addr)) {
-          contact._seenEmails.add(addr);
-          contact.emails.push({ address: e.ZADDRESS, label: cleanLabel(e.ZLABEL) });
-        }
-      }
-
-      for (const rel of relStmt.all(r.Z_PK)) {
-        const relKey = `${rel.ZNAME.toLowerCase()}_${cleanLabel(rel.ZLABEL)}`;
-        if (!contact._seenRels.has(relKey)) {
-          contact._seenRels.add(relKey);
-          contact.relationships.push({ name: rel.ZNAME, type: cleanLabel(rel.ZLABEL) });
-        }
-      }
-
-      try {
-        for (const a of addrStmt.all(r.Z_PK)) {
-          const parts = [a.ZSTREET, a.ZCITY, a.ZSTATE, a.ZZIPCODE, a.ZCOUNTRYNAME].filter(Boolean);
-          if (parts.length) {
-            contact.addresses.push({ full: parts.join(', '), label: cleanLabel(a.ZLABEL) });
+      if (includeExtendedFields) {
+        for (const e of emailStmt.all(r.Z_PK)) {
+          const addr = e.ZADDRESS.toLowerCase();
+          if (!contact._seenEmails.has(addr)) {
+            contact._seenEmails.add(addr);
+            contact.emails.push({ address: e.ZADDRESS, label: cleanLabel(e.ZLABEL) });
           }
         }
-      } catch (_) {}
+
+        for (const rel of relStmt.all(r.Z_PK)) {
+          const relKey = `${rel.ZNAME.toLowerCase()}_${cleanLabel(rel.ZLABEL)}`;
+          if (!contact._seenRels.has(relKey)) {
+            contact._seenRels.add(relKey);
+            contact.relationships.push({ name: rel.ZNAME, type: cleanLabel(rel.ZLABEL) });
+          }
+        }
+
+        try {
+          for (const a of addrStmt.all(r.Z_PK)) {
+            const parts = [a.ZSTREET, a.ZCITY, a.ZSTATE, a.ZZIPCODE, a.ZCOUNTRYNAME].filter(Boolean);
+            if (parts.length) {
+              contact.addresses.push({ full: parts.join(', '), label: cleanLabel(a.ZLABEL) });
+            }
+          }
+        } catch (_) {}
+      }
     }
 
     db.close();
@@ -140,10 +149,20 @@ for (const dbPath of dbPaths) {
 // Strip internal tracking sets, filter to contacts with at least phone or email
 const contacts = [];
 for (const c of mergeMap.values()) {
+  const hasReachableAddress = c.phones.length || (includeExtendedFields && c.emails.length);
   delete c._seenPhones;
   delete c._seenEmails;
   delete c._seenRels;
-  if (c.phones.length || c.emails.length) contacts.push(c);
+  if (!includeExtendedFields) {
+    delete c.nickname;
+    delete c.organization;
+    delete c.jobTitle;
+    delete c.note;
+    delete c.emails;
+    delete c.relationships;
+    delete c.addresses;
+  }
+  if (hasReachableAddress) contacts.push(c);
 }
 
 // Output path relative to this script (runtime/scripts/ → runtime/contacts-cache.json)
@@ -155,4 +174,5 @@ fs.writeFileSync(outPath, JSON.stringify({
 }, null, 2));
 
 console.log(`✓ Exported ${contacts.length} contacts → contacts-cache.json`);
+console.log(`  Fields: ${includeExtendedFields ? 'extended local-only contact fields' : 'names and phone numbers only'}`);
 console.log('  This file is local-only and excluded from version control.');

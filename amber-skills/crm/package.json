@@ -8,7 +8,7 @@
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
+  "license": "MIT-0",
   "type": "commonjs",
   "dependencies": {
     "better-sqlite3": "^12.6.2"

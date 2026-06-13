@@ -711,8 +711,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           } else {
             const digits = contactPhone!.replace(/\D/g, '').slice(-10);
             matches = contacts.filter((c: any) => {
-              const phoneDigits = (c.phone || '').replace(/\D/g, '').slice(-10);
-              return phoneDigits === digits;
+              const phones = Array.isArray(c.phones) ? c.phones : (c.phone ? [{ number: c.phone }] : []);
+              return phones.some((p: any) => String(p.number || '').replace(/\D/g, '').slice(-10) === digits);
             });
           }
 

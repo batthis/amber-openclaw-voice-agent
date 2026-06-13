@@ -3,7 +3,7 @@ name: amber-voice-assistant
 title: "Amber — Give Your Agent Real Phone Capabilities"
 description: "Give your OpenClaw agent real phone capabilities. Setup uses a short wizard; after setup, run calls and phone tasks with one natural-language prompt."
 homepage: https://github.com/batthis/amber-openclaw-voice-agent
-metadata: {"openclaw":{"emoji":"☎️","requires":{"env":[],"optionalEnv":["AMBER_ENABLE_OUTBOUND_CALLS","OPENCLAW_GATEWAY_URL","TWILIO_WEBHOOK_STRICT","VOICE_PROVIDER","VOICE_WEBHOOK_SECRET","ASSISTANT_NAME","OPERATOR_NAME","AMBER_CRM_DB_PATH","AGENT_MD_PATH","DEFAULT_CALENDAR"],"anyBins":["node","ical-query"]},"install":[{"id":"runtime","kind":"node","cwd":"runtime","label":"Install Amber runtime (cd runtime && npm ci && npm run build)"}]}}
+metadata: {"openclaw":{"emoji":"☎️","requires":{"env":[],"optionalEnv":["AMBER_ENABLE_OUTBOUND_CALLS","OPENCLAW_GATEWAY_URL","TWILIO_WEBHOOK_STRICT","VOICE_PROVIDER","VOICE_WEBHOOK_SECRET","ASSISTANT_NAME","OPERATOR_NAME","AMBER_CRM_DB_PATH","AGENT_MD_PATH","DEFAULT_CALENDAR","AMBER_CONTACTS_EXTENDED"],"anyBins":["node","ical-query"]},"permissions":{"network":true,"env":true,"webhooks":true,"localFiles":["runtime/logs/","runtime/contacts-cache.json","~/.config/amber/crm.sqlite"],"localBinaries":["node","ical-query"],"mcpTools":["prepare_call","start_call","call_history","crm","contacts_lookup","calendar","screening_control","bridge_health"],"externalServices":["Twilio or compatible voice provider","OpenAI Realtime/API","optional OpenClaw Gateway"]},"install":[{"id":"runtime","kind":"node","cwd":"runtime","label":"Install Amber runtime (cd runtime && npm ci && npm run build)"}]}}
 ---
 
 # Amber — Give Your Agent Real Phone Capabilities
@@ -11,6 +11,8 @@ metadata: {"openclaw":{"emoji":"☎️","requires":{"env":[],"optionalEnv":["AMB
 ## Overview
 
 Amber gives any OpenClaw deployment **real phone capabilities for agents**. It ships with a **production-ready Twilio + OpenAI Realtime bridge** (`runtime/`) for confirmed phone workflows: inbound answering, call screening, prepared outbound workflows, and confirmed scheduling over a real telephone number.
+
+Amber is a sensitive communications system. It can process call audio/transcripts through configured voice and AI providers, store local call logs, maintain a local CRM, read/write the operator calendar, expose local MCP tools, and optionally use an Apple Contacts export for name-to-number resolution. Operators should configure caller notice/consent, retention/deletion practices, and least-privilege provider credentials before production use.
 
 **✨ New in v5.4.0:** Amber now ships as an **MCP plugin** with 9 tools — prepare confirmed calls by name, check call history, query CRM contacts, manage calendar, and control call screening. It works with Claude Desktop/Cowork and other MCP-capable clients or agent harnesses once configured. Includes Apple Contacts integration and a code-enforced call confirmation safeguard to prevent wrong-number dials.
 
@@ -28,7 +30,7 @@ Amber gives any OpenClaw deployment **real phone capabilities for agents**. It s
 
 - **Runtime bridge** (`runtime/`) — a complete Node.js server that connects Twilio phone calls to OpenAI Realtime with OpenClaw brain-in-the-loop
 - **Amber Skills** (`amber-skills/`) — modular mid-call capabilities (CRM, calendar, log & forward message) with a spec for building your own
-- **Built-in CRM** — local SQLite contact database; Amber greets callers by name and references personal context naturally on every call, with operator review/correction responsibility
+- **Built-in CRM** — local SQLite contact database; Amber can greet callers by name and use operator-approved context naturally on calls, with operator review/correction responsibility
 - **Call log dashboard** (`dashboard/`) — browse call history, transcripts, and captured messages; includes **manual Sync button** to pull new calls on demand
 - **Setup & validation scripts** — preflight checks, env templates, quickstart runner
 - **Architecture docs & troubleshooting** — call flow diagrams, common failure runbooks
@@ -45,9 +47,9 @@ Amber remembers every caller across calls and uses that memory to personalize ev
 - **Runtime-managed** — lookup and logging happen automatically; Amber never has to "remember" to call CRM
 - **Personalized greeting** — known callers can be greeted by name; optional notes are used only when relevant to the call objective
 - **Two-pass enrichment** — auto-log captures the call immediately; an optional post-call extraction pass proposes caller details and notes for the local CRM
-- **Operator review expected** — review, correct, or delete CRM records periodically so bad transcript extraction or misleading caller input does not persist indefinitely
+- **Operator review expected** — review, correct, or delete CRM records periodically so bad transcript extraction, misleading caller input, or overly sensitive details do not persist indefinitely
 - **Symmetric** — works identically for inbound and outbound calls
-- **Local SQLite CRM** — contact memory is stored at `~/.config/amber/crm.sqlite`; CRM records are not cloud-hosted. Live call audio/transcripts still pass through Twilio/OpenAI as part of the phone bridge.
+- **Local SQLite CRM** — contact memory is stored at `~/.config/amber/crm.sqlite`; CRM records are not cloud-hosted. Live call audio/transcripts still pass through Twilio/OpenAI as part of the phone bridge. Tell callers when calls are handled by an AI assistant and may be logged/used for follow-up, according to your local consent requirements.
 - **Native dependency** — requires `better-sqlite3` (native build). macOS: `sudo xcodebuild -license accept` before `npm install`. Linux: `build-essential` + `python3`.
 
 ### 📅 Calendar
@@ -77,6 +79,8 @@ Amber's skill system is designed to grow. Each skill is a self-contained directo
 - **Share skills** with the OpenClaw community via [ClawHub](https://clawhub.com)
 
 See [`amber-skills/`](amber-skills/) for examples and the full specification to get started.
+
+**Contacts privacy:** Apple Contacts sync is opt-in. By default it exports only names and phone numbers needed for call-by-name. Set `AMBER_CONTACTS_EXTENDED=true` only if you explicitly want extra local-only fields such as email, organization, relationships, addresses, and notes in `runtime/contacts-cache.json`.
 
 > **Note:** Each skill's `handler.js` is reviewed against its declared permissions. When building or installing third-party skills, review the handler source as you would any Node.js module.
 
