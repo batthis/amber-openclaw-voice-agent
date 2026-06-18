@@ -171,8 +171,8 @@ export async function handleSkillCall(
 
     // Router-level confirmation enforcement for 'act' skills.
     // All 'act' skills require confirmed: true by default.
-    // A skill may opt out by explicitly setting confirmation_required: false in its manifest,
-    // but this should only be done for non-destructive actions (e.g. read-only lookups declared as 'act').
+    // A skill may opt out by setting its manifest confirmation flag to false,
+    // but only for non-destructive actions (e.g. read-only lookups declared as 'act').
     // This is a programmatic guarantee enforced at the router level — not left to LLM prompting.
     const isActSkill = manifest.amber.capabilities.includes('act');
     if (isActSkill && manifest.amber.confirmation_required !== false) {

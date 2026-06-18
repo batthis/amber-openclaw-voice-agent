@@ -7,3 +7,9 @@ runtime/contacts-cache.json
 amber-skills/crm/node_modules/
 amber-skills/calendar/node_modules/
 demo/
+runtime/data/
+data/
+dashboard/data/
+dashboard/data-tmp-bridge/
+tmp-bridge-logs/
+.DS_Store

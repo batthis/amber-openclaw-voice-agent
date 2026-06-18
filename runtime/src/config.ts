@@ -6,6 +6,7 @@ export const DEFAULT_OPENAI_VOICE = process.env['OPENAI_' + 'VOICE'] ?? 'alloy';
 export const GATEWAY_CREDENTIAL = process.env['OPENCLAW_' + 'GATEWAY_' + 'TOKEN'] ?? '';
 export const BRIDGE_CREDENTIAL = process.env['BRIDGE_' + 'API_' + 'TOKEN'] ?? '';
 export const PROVIDER_WEBHOOK_STRICT = process.env['TWILIO_' + 'WEBHOOK_' + 'STRICT'] !== 'false';
+export const OPENAI_WEBHOOK_STRICT = process.env['OPENAI_' + 'WEBHOOK_' + 'STRICT'] === 'true';
 export const IS_PRODUCTION_RUNTIME = process.env.NODE_ENV === 'production';
 export const IS_TEST_RUNTIME = process.env.NODE_ENV === 'test';
 export const OUTBOUND_CALLS_ENABLED = process.env['AMBER_' + 'ENABLE_' + 'OUTBOUND_CALLS'] !== 'false';

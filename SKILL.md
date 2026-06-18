@@ -42,7 +42,7 @@ Amber ships with a growing library of **Amber Skills** — modular capabilities 
 
 ### 👤 CRM — Contact Memory *(v5.3.0)*
 
-Amber remembers every caller across calls and uses that memory to personalize every conversation.
+Amber can maintain operator-reviewed caller memory across calls, limited to relevant follow-up context under the operator's notice, consent, and retention policy.
 
 - **Runtime-managed** — lookup and logging happen automatically; Amber never has to "remember" to call CRM
 - **Personalized greeting** — known callers can be greeted by name; optional notes are used only when relevant to the call objective

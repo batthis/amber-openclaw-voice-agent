@@ -45,7 +45,7 @@ Same exact flow: lookup at start, upsert + log_interaction at end.
 
 - **Event details stay private.** Like the calendar skill, never disclose event details to callers.
 - **CRM context is personal.** The `context_notes` field is for Amber's internal memory, not for sharing call transcripts. Use it to inform conversation, not to recite it.
-- **PII storage.** Phone, name, email, company, context_notes are stored locally in SQLite. No network transmission, no external CRM by default.
+- **PII storage.** Phone, name, email, company, context_notes, call summaries, and interaction metadata are stored locally in SQLite. Operators must provide appropriate caller notice/consent and retention/deletion practices. No network transmission, no external CRM by default.
 - **Review and correction.** Operators should periodically review, correct, or delete CRM entries so inaccurate transcript extraction or overly sensitive details do not persist.
 
 ## Security
@@ -73,5 +73,5 @@ Amber (aloud): "That's wonderful! Congrats!"
 **End-of-call log:**
 ```
 Amber: [calls log_interaction: summary="Called to reschedule Friday appointment", outcome="appointment_booked"]
-Amber: [calls upsert_contact with context_notes: "Prefers afternoon calls. Recently married. Reschedules frequently but always shows up."]
+Amber: [calls upsert_contact with context_notes: "Prefers afternoon callbacks. Usually calls to reschedule appointments."]
 ```

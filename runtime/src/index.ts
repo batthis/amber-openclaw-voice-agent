@@ -11,7 +11,7 @@ import { createProvider } from './providers/index.js';
 import type { IVoiceProvider } from './providers/index.js';
 import { loadSkills, registerSkills, isSkillFunction, getSkillTools, handleSkillCall, callSkillDirectly } from './skills/index.js';
 import type { HandleSkillCallDeps } from './skills/index.js';
-import { BRIDGE_CREDENTIAL as DEFAULT_BRIDGE_CREDENTIAL, DEFAULT_OPENAI_VOICE, GATEWAY_BASE_URL, GATEWAY_CREDENTIAL, IS_PRODUCTION_RUNTIME, IS_TEST_RUNTIME, OUTBOUND_CALLS_ENABLED, PROVIDER_WEBHOOK_STRICT, REALTIME_INTERRUPT_RESPONSE, REALTIME_NOISE_REDUCTION, RUNTIME_PORT, getPersonalizationConfig, getTelephonyRuntimeConfig, getTelnyxRuntimeConfig, getVoiceProviderName, requireRuntimeEnv } from './config.js';
+import { BRIDGE_CREDENTIAL as DEFAULT_BRIDGE_CREDENTIAL, DEFAULT_OPENAI_VOICE, GATEWAY_BASE_URL, GATEWAY_CREDENTIAL, IS_PRODUCTION_RUNTIME, IS_TEST_RUNTIME, OPENAI_WEBHOOK_STRICT, OUTBOUND_CALLS_ENABLED, PROVIDER_WEBHOOK_STRICT, REALTIME_INTERRUPT_RESPONSE, REALTIME_NOISE_REDUCTION, RUNTIME_PORT, getPersonalizationConfig, getTelephonyRuntimeConfig, getTelnyxRuntimeConfig, getVoiceProviderName, requireRuntimeEnv } from './config.js';
 
 // ─── Security Helpers ───
 
@@ -129,11 +129,11 @@ const TWILIO_WEBHOOK_STRICT = PROVIDER_WEBHOOK_STRICT;
 // Production startup guard: refuse to start if webhook secret is missing (non-Twilio providers).
 // For Twilio, VOICE_WEBHOOK_SECRET always has a value (falls back to required Twilio credential).
 // For other providers there is no fallback, so a missing secret means any spoofed request
-// would be accepted. Hard-fail here rather than silently degrading security.
+// would be accepted. Hard-fail here rather than running with weak webhook protection.
 if (IS_PRODUCTION_RUNTIME && !VOICE_WEBHOOK_SECRET && VOICE_PROVIDER !== 'twilio') {
   throw new Error(
     'FATAL: VOICE_WEBHOOK_SECRET must be set in production when VOICE_PROVIDER is not "twilio". ' +
-    'Without it, webhook signature validation is disabled and spoofed requests will be accepted. ' +
+    'Webhook signature protection cannot run safely without that secret, so spoofed requests could be accepted. ' +
     'Set VOICE_WEBHOOK_SECRET in your .env or environment.'
   );
 }
@@ -666,8 +666,18 @@ app.post('/openai/webhook', async (req: Request, res: Response) => {
         return res.status(401).send('Unauthorized: Invalid signature');
       }
     } else {
-      // OpenAI Realtime SIP webhooks may not include signature headers yet
-      console.warn('WEBHOOK_NO_SIGNATURE_HEADER', { bodyLength: rawBody.length });
+      if (OPENAI_WEBHOOK_STRICT) {
+        console.error('WEBHOOK_SIGNATURE_MISSING', {
+          hasSecret: !!OPENAI_WEBHOOK_SECRET,
+          bodyLength: rawBody.length
+        });
+        return res.status(401).send('Unauthorized: Missing signature');
+      }
+
+      console.warn('WEBHOOK_NO_SIGNATURE_HEADER', {
+        bodyLength: rawBody.length,
+        openaiWebhookStrict: false
+      });
     }
 
     const event = JSON.parse(rawBody.toString('utf8'));
@@ -2087,15 +2097,15 @@ Extract the following from the transcript. Return ONLY valid JSON, no explanatio
   "caller_name": "string or null — the caller's first name or full name if mentioned",
   "caller_email": "string or null — email if mentioned",
   "caller_company": "string or null — company/organization if mentioned",
-  "context_notes": "string or null — 2-5 sentence summary of personal context worth remembering: pet names, health issues, preferences, life events, recurring topics, anything that would make a future call feel more personal. Null if nothing notable.",
+  "context_notes": "string or null — 1-3 sentence summary of relevant, non-sensitive follow-up context (communication preferences, recurring operational topics, requested callback constraints). Do NOT include health, family/relationship, financial, legal, political/religious, intimate, or unnecessary personal details. Null if nothing clearly useful and appropriate to retain.",
   "call_summary": "string — one sentence describing what the call was about",
   "call_outcome": "one of: message_left, appointment_booked, info_provided, callback_requested, transferred, other"
 }
 
 Rules:
 - caller_name: only set if the caller explicitly stated their name (not if Amber guessed it)
-- context_notes: personal details that would be useful in a FUTURE call (not operational notes)
-- Be conservative — only extract what was actually said, never invent or infer
+- context_notes: relevant, non-sensitive follow-up context only; prefer operational preferences over personal life details
+- Be conservative — only extract what was actually said, never invent or infer; when in doubt, omit context_notes
 - Return null for any field not clearly present in the transcript`;
 
     const response = await extractionClient.chat.completions.create({

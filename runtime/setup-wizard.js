@@ -64,7 +64,7 @@ async function validateTwilio(sid, token) {
       headers: { Authorization: 'Basic ' + Buffer.from(`${sid}:${token}`).toString('base64') },
     });
     s.stop();
-    if (res.ok) { ok('Twilio credentials valid'); return true; }
+    if (res.ok) { ok('Twilio credentials verified with Twilio over HTTPS'); return true; }
     fail(`Twilio auth failed (HTTP ${res.status})`);
     return false;
   } catch (e) {
@@ -81,7 +81,7 @@ async function validateOpenAI(key) {
       headers: { Authorization: `Bearer ${key}` },
     });
     s.stop();
-    if (res.ok) { ok('OpenAI API key valid'); return true; }
+    if (res.ok) { ok('OpenAI API key verified with OpenAI over HTTPS'); return true; }
     fail(`OpenAI auth failed (HTTP ${res.status})`);
     return false;
   } catch (e) {
@@ -128,6 +128,9 @@ ${c.bold}${c.cyan}╔═══════════════════�
 ╚══════════════════════════════════════════════╝${c.reset}
 `);
   info('This wizard will walk you through configuration and generate a .env file.');
+  warn('Amber is a sensitive communications system: calls may be handled by AI providers and logged locally.');
+  warn('Secrets and operator contact details entered here are written to runtime/.env; keep that file private and out of published packages.');
+  info('Credential validation calls only the relevant provider APIs over HTTPS (Twilio/OpenAI) and does not send secrets to Amber or ClawHub.');
   info('Press Enter to accept defaults shown in parentheses.\n');
 
   const cfg = {};
@@ -204,10 +207,10 @@ ${c.bold}${c.cyan}╔═══════════════════�
   let publicUrl = null;
 
   if (ngrokInstalled) {
-    ok('ngrok detected');
+    ok('ngrok binary detected locally');
     const tunnel = await getActiveNgrokTunnel();
     if (tunnel) {
-      ok(`Active ngrok tunnel found: ${tunnel}`);
+      ok(`Active local ngrok tunnel detected: ${tunnel}`);
       if (await yesNo(`Use ${tunnel} as PUBLIC_BASE_URL?`)) publicUrl = tunnel;
     } else {
       info('No active ngrok tunnel found.');
@@ -260,6 +263,7 @@ ${c.bold}${c.cyan}╔═══════════════════�
 
   // ── Generate .env ──────────────────────────────────────────────────
   head('Generating .env');
+  warn('Writing secrets, phone numbers, and optional operator identity fields to runtime/.env. Protect this file and rotate credentials if it is exposed.');
 
   if (existsSync(envPath)) {
     const ts = new Date().toISOString().replace(/[:.]/g, '-');

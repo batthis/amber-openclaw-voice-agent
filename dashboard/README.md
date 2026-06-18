@@ -11,6 +11,15 @@ A beautiful web dashboard for viewing and managing call logs from the Amber Voic
 - 🔔 Follow-up tracking with localStorage persistence
 - ⚡ Auto-refresh when data changes (every 30s)
 
+## Privacy and Access Control
+
+This dashboard displays call logs, transcripts, captured messages, callback numbers, and contact-resolution data. Treat the generated `data/` directory and any browser/localStorage follow-up markers as sensitive communications records.
+
+- Run the server on loopback only (`127.0.0.1`) unless you put it behind authentication, TLS, and a trusted network boundary.
+- Do not bind this dashboard to all network interfaces on an untrusted LAN or public host.
+- Review and delete generated dashboard data according to your caller notice, consent, and retention policy.
+- Do not commit or publish generated dashboard data, contact caches, transcripts, or call logs.
+
 ## Setup
 
 ### 1. Environment Variables
@@ -94,8 +103,11 @@ The processor reads call logs from the `LOGS_DIR` (or `../runtime/logs` by defau
 node scripts/serve.js
 # Open http://127.0.0.1:8787/
 
-# Or custom port/host
-node scripts/serve.js --port 8080 --host 0.0.0.0
+# Or custom loopback port
+node scripts/serve.js --port 8080 --host 127.0.0.1
+
+# Only bind to a network interface when you have added authentication/TLS
+# and understand that call logs/transcripts may be exposed to that network.
 ```
 
 **Option 2: File Protocol**
