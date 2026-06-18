@@ -118,6 +118,67 @@ async function startNgrok(port) {
   return null;
 }
 
+function shellQuote(value) {
+  return "'" + String(value).replace(/'/g, "'\\''") + "'";
+}
+
+function writeHermesInstallFiles(cfg) {
+  const repoRoot = resolve(__dirname, '..');
+  const runtimeDir = __dirname;
+  const hermesDir = resolve(repoRoot, 'packaging', 'hermes');
+  const skillSourcePath = resolve(hermesDir, 'SKILL.md');
+  const mcpSourcePath = resolve(hermesDir, 'mcp_servers.yaml');
+  const generatedPath = resolve(runtimeDir, 'hermes-install.md');
+  const mcpServerPath = resolve(runtimeDir, 'dist', 'mcp-server.js');
+  const bridgeUrl = `http://127.0.0.1:${cfg.PORT || '8000'}`;
+  const content = `# Amber for Hermes — Generated Install Notes
+
+Generated: ${new Date().toISOString()}
+
+## 1. Install the Hermes skill wrapper
+
+\`\`\`bash
+mkdir -p ~/.hermes/skills/amber-phone-agent
+cp ${shellQuote(skillSourcePath)} ~/.hermes/skills/amber-phone-agent/SKILL.md
+\`\`\`
+
+## 2. Add Amber MCP to Hermes config
+
+Add this block to your Hermes Agent config, then restart Hermes or run \`/reload-mcp\`:
+
+\`\`\`yaml
+mcp_servers:
+  amber_voice:
+    command: "node"
+    args:
+      - ${JSON.stringify(mcpServerPath)}
+    env:
+      AMBER_BRIDGE_URL: ${JSON.stringify(bridgeUrl)}
+      BRIDGE_API_TOKEN: ""
+\`\`\`
+
+## 3. Start Amber
+
+\`\`\`bash
+cd ${shellQuote(runtimeDir)}
+npm start
+\`\`\`
+
+## 4. Verify
+
+- \`curl ${bridgeUrl}/healthz\` should return \`{"ok":true}\`.
+- In Hermes, ask: \`Tell me which MCP-backed tools are available right now.\`
+- Use \`bridge_health\` before trying real calls.
+
+Static reference files:
+
+- ${skillSourcePath}
+- ${mcpSourcePath}
+`;
+  writeFileSync(generatedPath, content);
+  return { generatedPath, skillSourcePath, mcpSourcePath, bridgeUrl };
+}
+
 // ── Main ─────────────────────────────────────────────────────────────
 async function main() {
   rl = createInterface({ input: stdin, output: stdout });
@@ -232,13 +293,28 @@ ${c.bold}${c.cyan}╔═══════════════════�
   info('Outbound calling is enabled by default for the full Amber experience. You can disable it later.');
   cfg.AMBER_ENABLE_OUTBOUND_CALLS = await yesNo('Enable outbound calling?', true) ? 'true' : 'false';
 
-  // ── Optional: OpenClaw ─────────────────────────────────────────────
-  head('OpenClaw Gateway (optional)');
-  info('If you have an OpenClaw gateway, the assistant can consult it during calls.');
+  // ── Agent Platform Integration ───────────────────────────────────
+  head('Agent Platform Integration');
+  info("Amber's phone runtime is platform-agnostic. This only changes the agent-facing setup notes.");
+  info('Supported targets: openclaw, hermes, mcp, none');
 
-  if (await yesNo('Configure OpenClaw integration?', false)) {
-    cfg.OPENCLAW_GATEWAY_URL = await ask('Gateway URL', 'http://127.0.0.1:18789');
-    cfg.OPENCLAW_GATEWAY_TOKEN = await ask('Gateway Token', '');
+  while (true) {
+    cfg.AMBER_AGENT_PLATFORM = (await ask('Target agent platform', 'openclaw')).toLowerCase();
+    if (['openclaw', 'hermes', 'mcp', 'none'].includes(cfg.AMBER_AGENT_PLATFORM)) break;
+    fail('Choose one of: openclaw, hermes, mcp, none');
+  }
+
+  if (cfg.AMBER_AGENT_PLATFORM === 'openclaw') {
+    info('If you have an OpenClaw gateway, the assistant can consult it during calls.');
+    if (await yesNo('Configure OpenClaw integration?', false)) {
+      cfg.OPENCLAW_GATEWAY_URL = await ask('Gateway URL', 'http://127.0.0.1:18789');
+      cfg.OPENCLAW_GATEWAY_TOKEN = await ask('Gateway Token', '');
+    }
+  } else if (cfg.AMBER_AGENT_PLATFORM === 'hermes') {
+    info("Hermes integration uses Amber's MCP server plus a Hermes AgentSkill wrapper.");
+    info('The wizard will generate runtime/hermes-install.md with exact paths for this machine.');
+  } else if (cfg.AMBER_AGENT_PLATFORM === 'mcp') {
+    info('Generic MCP mode uses runtime/dist/mcp-server.js from any MCP-compatible client.');
   }
 
   // ── Optional: Personalization ──────────────────────────────────────
@@ -294,6 +370,9 @@ ${c.bold}${c.cyan}╔═══════════════════�
     `PORT=${cfg.PORT}`,
     `PUBLIC_BASE_URL=${cfg.PUBLIC_BASE_URL}`,
     '',
+    '# === Agent Platform ===',
+    `AMBER_AGENT_PLATFORM=${cfg.AMBER_AGENT_PLATFORM || 'openclaw'}`,
+    '',
     '# === Safety ===',
     '# Outbound calling defaults to enabled. Set false to disable the outbound call endpoint.',
     `AMBER_ENABLE_OUTBOUND_CALLS=${cfg.AMBER_ENABLE_OUTBOUND_CALLS}`,
@@ -319,6 +398,12 @@ ${c.bold}${c.cyan}╔═══════════════════�
   lines.push('');
   writeFileSync(envPath, lines.join('\n'));
   ok(`.env written to ${envPath}`);
+
+  let hermesInstall = null;
+  if (cfg.AMBER_AGENT_PLATFORM === 'hermes') {
+    hermesInstall = writeHermesInstallFiles(cfg);
+    ok(`Hermes install notes written to ${hermesInstall.generatedPath}`);
+  }
 
   // ── Post-setup ─────────────────────────────────────────────────────
   head('Post-Setup');
@@ -353,6 +438,12 @@ ${c.bold}${c.cyan}╔═══════════════════�
   const hasNativeTools = process.platform === 'darwin' &&
     existsSync(resolve(__dirname, '..', 'tools', 'ical-query'));
   const hasContactsCache = isCowork && existsSync(resolve(__dirname, 'contacts-cache.json'));
+  const hermesNotes = cfg.AMBER_AGENT_PLATFORM === 'hermes' && hermesInstall ? `
+  ${hasNativeTools || hasContactsCache ? '6' : '4'}. ${c.cyan}Hermes Agent integration:${c.reset}
+     Install notes generated at:
+     ${c.bold}${hermesInstall.generatedPath}${c.reset}
+     Copy the skill wrapper to ~/.hermes/skills/amber-phone-agent/ and add the MCP config snippet.
+` : '';
 
   console.log(`
 ${c.bold}Next steps:${c.reset}
@@ -376,7 +467,7 @@ ${hasNativeTools ? `
   ${hasNativeTools ? '5' : '4'}. ${c.cyan}Contacts:${c.reset}
      Apple Contacts synced to local cache.
      To refresh: ${c.bold}npm run sync-contacts${c.reset}
-` : ''}
+` : ''}${hermesNotes}
 ${c.dim}Config saved to: ${envPath}${c.reset}
 `);
 
