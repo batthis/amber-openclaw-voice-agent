@@ -123,6 +123,6 @@ After setup, verify in this order:
 ## Pitfalls
 
 - If Hermes cannot see Amber tools, check the `mcp_servers` path and run `/reload-mcp`.
-- If calls ring but Amber does not speak, check `PUBLIC_BASE_URL`, Twilio webhooks, ngrok, and OpenAI webhook settings.
+- If calls ring but Amber does not speak, check `PUBLIC_BASE_URL`, your public HTTPS tunnel or domain, Twilio webhooks, and OpenAI webhook settings.
 - If contact lookup fails on macOS, run `npm run sync-contacts` from the Amber runtime directory.
 - If calendar access fails on macOS, grant the helper access in System Settings → Privacy & Security → Calendar.
