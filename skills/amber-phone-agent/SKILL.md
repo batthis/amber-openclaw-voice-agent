@@ -1,9 +1,13 @@
 ---
 name: amber-phone-agent
 description: Give Hermes Agent real phone capabilities through Amber's Twilio/OpenAI voice bridge and MCP tools.
-version: 5.5.39
+version: "5.5.39"
+license: MIT
+compatibility: Node.js 20+, Twilio account, OpenAI API key, Hermes Agent with MCP support
 platforms: [macos, linux]
 metadata:
+  author: batthis
+  repository: https://github.com/batthis/amber-openclaw-voice-agent
   hermes:
     tags: [phone, voice, twilio, openai, mcp, receptionist, calendar, crm]
     category: communication
