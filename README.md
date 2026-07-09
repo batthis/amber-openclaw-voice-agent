@@ -188,3 +188,7 @@ Full documentation is in [SKILL.md](SKILL.md) — including setup guides, enviro
 ## License
 
 [MIT](LICENSE) — Copyright (c) 2026 Abe Batthish
+
+## Download History
+
+[![Download History](https://skill-history.com/chart/batthis/amber-phone-agent.svg)](https://skill-history.com/batthis/amber-phone-agent)
