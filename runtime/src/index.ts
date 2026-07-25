@@ -1105,9 +1105,9 @@ const callAccept = {
       await Promise.all([endStream(jsonlStream), endStream(transcriptStream)]);
       await finalizeSummaryFromTranscript(callId);
 
-      // CRM auto-log — runtime-managed. Read the transcript, upsert contact, log interaction.
-      // This runs regardless of whether Amber called the CRM herself during the call.
-      if (callerPhone) {
+      // Opt-in CRM auto-log. Enable with AMBER_CRM_ENABLED=true after caller
+      // notice/consent and retention practices are configured.
+      if (CRM_ENABLED && callerPhone) {
         try {
           const transcriptText = fs.existsSync(logsTranscriptPath(callId))
             ? fs.readFileSync(logsTranscriptPath(callId), 'utf8').trim()

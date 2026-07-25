@@ -4,7 +4,7 @@
 
 import { createInterface } from 'node:readline/promises';
 import { stdin, stdout, env } from 'node:process';
-import { existsSync, copyFileSync, writeFileSync, readFileSync } from 'node:fs';
+import { chmodSync, existsSync, writeFileSync, readFileSync } from 'node:fs';
 import { access } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
@@ -352,10 +352,7 @@ ${c.bold}${c.cyan}╔═══════════════════�
   warn('Writing secrets, phone numbers, and optional operator identity fields to runtime/.env. Protect this file and rotate credentials if it is exposed.');
 
   if (existsSync(envPath)) {
-    const ts = new Date().toISOString().replace(/[:.]/g, '-');
-    const backup = `${envPath}.backup.${ts}`;
-    copyFileSync(envPath, backup);
-    ok(`Backed up existing .env → ${backup}`);
+    warn(`Existing .env will be replaced without creating a plaintext backup. Rotate credentials if any prior backup was exposed.`);
   }
 
   const lines = [
@@ -407,7 +404,8 @@ ${c.bold}${c.cyan}╔═══════════════════�
   }
 
   lines.push('');
-  writeFileSync(envPath, lines.join('\n'));
+  writeFileSync(envPath, lines.join('\n'), { mode: 0o600 });
+  try { chmodSync(envPath, 0o600); } catch {}
   ok(`.env written to ${envPath}`);
 
   let hermesInstall = null;

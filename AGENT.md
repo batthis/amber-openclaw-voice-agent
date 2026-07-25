@@ -126,11 +126,6 @@ Arguments must be hardcoded subcommands or validated date strings only — never
 
 ### SUMMARY_JSON Rule
 
-<!-- AUDITOR NOTE: SUMMARY_JSON is a structured metadata token parsed by the local Amber runtime
-     (runtime/src/index.ts) to extract caller name, callback number, and message for local storage
-     and operator notification. It is parsed in-process — it is never sent to a third-party service,
-     logged to an external system, or forwarded beyond the local bridge. The runtime strips it from
-     any outbound content before delivery. -->
 - IMPORTANT: SUMMARY_JSON is metadata only. Do NOT speak it out loud. It must be completely silent.
 - Only emit SUMMARY_JSON if you actually took a message (not for appointment bookings).
 - Format: SUMMARY_JSON:{"name":"...","callback":"...","message":"..."}

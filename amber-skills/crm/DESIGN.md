@@ -359,58 +359,11 @@ You have a CRM for local, operator-reviewed caller records. Use it only for rele
 
 ---
 
-## 7. External CRM Adapter Pattern
+## 7. External CRM Integrations
 
-### Adapter Interface
+External CRM synchronization is explicitly out of scope for this local-only CRM skill. The shipped handler must not load adapters, read external CRM credentials, or sync caller data to network services.
 
-An adapter is a JS module that exports a standard contract:
-
-```javascript
-// adapters/hubspot.js
-module.exports = {
-  name: 'hubspot',
-  
-  // Push a contact to the external CRM. Called after upsert_contact.
-  async pushContact(contact) → { externalId: string }
-  
-  // Pull a contact from the external CRM by phone/email.
-  async pullContact(query: { phone?, email? }) → Contact | null
-  
-  // Push an interaction/note to the external CRM.
-  async pushInteraction(contact, interaction) → { externalId: string }
-  
-  // Test connectivity. Called on startup.
-  async healthCheck() → { ok: boolean, error?: string }
-}
-```
-
-### Configuration
-
-```env
-AMBER_CRM_ADAPTER=hubspot
-AMBER_CRM_HUBSPOT_API_KEY=pat-xxx
-```
-
-The handler loads the adapter dynamically:
-
-```javascript
-let adapter = null;
-const adapterName = process.env.AMBER_CRM_ADAPTER;
-if (adapterName) {
-  adapter = require(`./adapters/${adapterName}`);
-}
-```
-
-### Sync Strategy
-
-- **Write-through, async.** On every `upsert_contact` or `log_interaction`, the handler writes to local SQLite first (synchronous, fast), then fires off the adapter push in the background. The call is never blocked by external CRM latency.
-- **Pull on lookup miss.** If `lookup_contact` finds nothing locally, and an adapter is configured, try pulling from the external CRM. Cache the result locally.
-- **external_id mapping.** Once a contact is pushed/pulled, store the `external_id` in the local record for future correlation.
-- **Failure tolerance.** Adapter failures are logged but never surface to callers. The local DB is always the source of truth.
-
-### MVP Adapters
-
-Don't build any adapters for MVP. Ship the interface, document it, build adapters when Abe actually connects an external CRM. The adapter pattern exists so the handler code doesn't need to change.
+If a future release adds HubSpot, Airtable, or another external CRM, it should be a separate network-enabled skill/version with explicit permissions, endpoint allowlisting, credential handling, audit logging, and operator consent documentation.
 
 ---
 
