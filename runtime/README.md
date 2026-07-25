@@ -205,12 +205,12 @@ During a call, if the AI assistant encounters a question it can't answer from it
 
 1. Call the `ask_openclaw` function with the question
 2. The bridge sends the question to OpenClaw's `/v1/chat/completions` endpoint (OpenAI-compatible)
-3. OpenClaw (your main agent) processes the question using all its tools (calendar, contacts, memory, etc.)
+3. OpenClaw (your main agent) processes the question using the tools available to that gateway session. Configure that session with a narrow allowlist for call-critical actions only.
 4. The answer is returned to the bridge
 5. The bridge sends the answer back to OpenAI Realtime
 6. The assistant speaks the answer to the caller
 
-This enables your voice assistant to access the full context and capabilities of your OpenClaw agent during live phone calls.
+This enables your voice assistant to access operator-approved context during live phone calls. Treat the gateway as a sensitive integration: limit enabled tools, require confirmation for side effects, and do not expose unrelated private data to callers.
 
 If OpenClaw is unavailable or times out, the bridge falls back to a lightweight OpenAI Chat Completions call with basic operator info from environment variables.
 

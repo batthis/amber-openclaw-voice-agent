@@ -1,7 +1,7 @@
 ---
 name: amber-voice-assistant
 title: "Amber — Give Your Agent Real Phone Capabilities"
-description: "Give your OpenClaw agent real phone capabilities. Setup uses a short wizard; after setup, run calls and phone tasks with one natural-language prompt."
+description: "Real phone assistant runtime with Twilio/OpenAI Realtime calling, inbound screening, confirmed outbound calls, local call logs/transcripts, optional local CRM/contact memory, calendar booking, contacts lookup, MCP tools, and a loopback-only dashboard."
 homepage: https://github.com/batthis/amber-openclaw-voice-agent
 metadata: {"openclaw":{"emoji":"☎️","requires":{"env":[],"optionalEnv":["AMBER_ENABLE_OUTBOUND_CALLS","AMBER_REALTIME_MODEL","OPENCLAW_GATEWAY_URL","TWILIO_WEBHOOK_STRICT","VOICE_PROVIDER","VOICE_WEBHOOK_SECRET","ASSISTANT_NAME","OPERATOR_NAME","AMBER_CRM_DB_PATH","AGENT_MD_PATH","DEFAULT_CALENDAR","AMBER_CONTACTS_EXTENDED"],"anyBins":["node","ical-query"]},"permissions":{"network":true,"env":true,"webhooks":true,"localFiles":["runtime/logs/","runtime/contacts-cache.json","~/.config/amber/crm.sqlite"],"localBinaries":["node","ical-query"],"mcpTools":["prepare_call","start_call","call_history","crm","contacts_lookup","calendar","screening_control","bridge_health"],"externalServices":["Twilio or compatible voice provider","OpenAI Realtime/API","optional OpenClaw Gateway"]},"install":[{"id":"runtime","kind":"node","cwd":"runtime","label":"Install Amber runtime (cd runtime && npm ci && npm run build)"}]}}
 ---
@@ -10,7 +10,7 @@ metadata: {"openclaw":{"emoji":"☎️","requires":{"env":[],"optionalEnv":["AMB
 
 ## Overview
 
-Amber gives any OpenClaw deployment **real phone capabilities for agents**. It ships with a **production-ready Twilio + OpenAI Realtime bridge** (`runtime/`) for confirmed phone workflows: inbound answering, call screening, prepared outbound workflows, and confirmed scheduling over a real telephone number.
+Amber gives any OpenClaw deployment **real phone capabilities for agents**. It ships with a **production-ready Twilio + OpenAI Realtime bridge** (`runtime/`) for confirmed phone workflows: inbound answering, call screening, prepared outbound workflows, confirmed scheduling over a real telephone number, local call logs/transcripts, optional local CRM/contact memory, contacts lookup, MCP tools, and a loopback-only dashboard.
 
 Amber is a sensitive communications system. It can process call audio/transcripts through configured voice and AI providers, store local call logs, maintain a local CRM, read/write the operator calendar, expose local MCP tools, and optionally use an Apple Contacts export for name-to-number resolution. Operators should configure caller notice/consent, retention/deletion practices, and least-privilege provider credentials before production use.
 

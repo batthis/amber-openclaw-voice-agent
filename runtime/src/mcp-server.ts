@@ -277,7 +277,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
       name: 'calendar_query',
       description:
         'Check calendar availability or create events. For lookups, returns ' +
-        'busy time slots (event titles are private). For creation, adds an event.',
+        'busy time slots (event titles are private). Event creation requires confirmed=true after explicit approval.',
       inputSchema: {
         type: 'object' as const,
         properties: {
@@ -313,6 +313,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
           notes: {
             type: 'string',
             description: 'For create: event notes (optional)',
+          },
+          confirmed: {
+            type: 'boolean',
+            description: 'For create: must be true after explicit confirmation of title, time, calendar, and notes.',
           },
         },
         required: ['action'],

@@ -1,6 +1,6 @@
 # ☎️ Amber — Give Your Agent Real Phone Capabilities
 
-**A phone capability layer for [OpenClaw](https://openclaw.ai)** — gives your OpenClaw agent inbound answering, screening, confirmed scheduling, and optional outbound calling via a provider-swappable telephony bridge + OpenAI Realtime. Twilio is the default and recommended provider. Amber also exposes MCP tools, so Claude Desktop/Cowork and other MCP-capable clients or agent harnesses can use the same phone, CRM, calendar, and call-history capabilities once configured.
+**A phone capability layer for [OpenClaw](https://openclaw.ai)** — gives your OpenClaw agent inbound answering, screening, confirmed scheduling, optional outbound calling, local call logs/transcripts, optional local CRM/contact memory, contacts lookup, MCP tools, and a loopback-only dashboard via a provider-swappable telephony bridge + OpenAI Realtime. Twilio is the default and recommended provider. Claude Desktop/Cowork and other MCP-capable clients or agent harnesses can use the same phone, CRM, calendar, and call-history capabilities once configured.
 
 [![ClawHub](https://img.shields.io/badge/ClawHub-amber--voice--assistant-blue)](https://clawhub.ai/skills/amber-voice-assistant)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)

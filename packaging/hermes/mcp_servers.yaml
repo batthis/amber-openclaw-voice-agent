@@ -7,6 +7,6 @@ mcp_servers:
     args:
       - "/absolute/path/to/amber-openclaw-voice-agent/runtime/dist/mcp-server.js"
     env:
-      AMBER_BRIDGE_URL: "http://127.0.0.1:8000"
+      AMBER_BRIDGE_URL: "http://localhost:8000"
       # Optional: set if your Amber bridge requires an API token.
       BRIDGE_API_TOKEN: ""

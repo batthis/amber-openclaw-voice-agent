@@ -109,8 +109,8 @@ const server = http.createServer((req, res) => {
   if (req.method === 'POST' && req.url === '/api/call') {
     readJsonBody(req)
       .then(async body => {
-        const bridgeUrl = String(body.bridgeUrl || process.env.AMBER_BRIDGE_URL || 'http://127.0.0.1:8000').replace(/\/+$/, '');
-        const bridgeToken = String(body.bridgeToken || process.env.BRIDGE_API_TOKEN || '');
+        const bridgeUrl = String(body.bridgeUrl || 'http://127.0.0.1:8000').replace(/\/+$/, '');
+        const bridgeToken = String(body.bridgeToken || '');
         const to = String(body.to || '').trim();
         const objective = String(body.objective || '').trim();
         const model = String(body.model || 'gpt-realtime').trim();

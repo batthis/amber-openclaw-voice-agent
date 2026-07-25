@@ -274,8 +274,7 @@ handler(params, context) {
      a. Validate inputs (same three-layer pattern as calendar)
      b. Open/init DB (lazy singleton — one connection per process lifetime)
      c. Execute query
-     d. If external adapter configured, sync (fire-and-forget, don't block call)
-     e. Return structured response
+     d. Return structured response
   4. On error: log to callLog, return graceful error message
 }
 ```
@@ -432,7 +431,7 @@ Don't build any adapters for MVP. Ship the interface, document it, build adapter
 ### Access Controls
 
 - **DB file permissions:** Created with mode `0600` (owner read/write only).
-- **No network exposure.** The CRM DB is local. No API server, no web endpoints. Access is only through the skill handler.
+- **No network exposure in the shipped handler.** The CRM DB is local. No API server, no web endpoints, no adapter loading, and no external sync. Access is only through the skill handler.
 - **Dashboard (if built)** runs on localhost only, behind the existing OpenClaw gateway auth.
 
 ### Data Retention
@@ -520,7 +519,7 @@ Scope:
 
 ### v2.0 — External + Advanced
 
-- External CRM adapter interface + first adapter (HubSpot or Airtable)
+- Possible future external CRM adapter interface in a separate network-enabled skill/version with explicit permissions
 - `delete_contact` action
 - Data retention / auto-archive
 - FTS5 full-text search
@@ -544,7 +543,7 @@ metadata: {"amber": {"capabilities": ["read", "act"], "confirmation_required": f
 Key decisions in the frontmatter:
 - **Confirmation opt-out** — CRM lookups/logging remain low-latency runtime operations, but writes must be limited to relevant, non-sensitive follow-up data under the operator's notice/consent and retention policy.
 - **`timeout_ms: 3000`** — SQLite queries are sub-millisecond. 3s is generous.
-- **`permissions.network: false`** — Local DB only. External adapter sync would need this flipped to `true` in v2.
+- **`permissions.network: false`** — Local DB only. External adapter sync is not part of this handler; it would require a separate network-enabled skill/version with explicit permissions.
 - **Capabilities: `["read", "act"]`** — Lookups are reads, upserts/logs are acts.
 
 ---
