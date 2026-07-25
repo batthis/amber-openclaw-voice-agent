@@ -11,7 +11,7 @@ import { createProvider } from './providers/index.js';
 import type { IVoiceProvider } from './providers/index.js';
 import { loadSkills, registerSkills, isSkillFunction, getSkillTools, handleSkillCall, callSkillDirectly } from './skills/index.js';
 import type { HandleSkillCallDeps } from './skills/index.js';
-import { BRIDGE_CREDENTIAL as DEFAULT_BRIDGE_CREDENTIAL, DEFAULT_OPENAI_VOICE, GATEWAY_BASE_URL, GATEWAY_CREDENTIAL, IS_PRODUCTION_RUNTIME, IS_TEST_RUNTIME, OPENAI_WEBHOOK_STRICT, OUTBOUND_CALLS_ENABLED, PROVIDER_WEBHOOK_STRICT, REALTIME_INTERRUPT_RESPONSE, REALTIME_MODEL, REALTIME_NOISE_REDUCTION, RUNTIME_PORT, getPersonalizationConfig, getTelephonyRuntimeConfig, getTelnyxRuntimeConfig, getVoiceProviderName, requireRuntimeEnv } from './config.js';
+import { BRIDGE_CREDENTIAL as DEFAULT_BRIDGE_CREDENTIAL, CRM_ENABLED, CRM_TRANSCRIPT_ENRICHMENT_ENABLED, DEFAULT_OPENAI_VOICE, GATEWAY_BASE_URL, GATEWAY_CREDENTIAL, IS_PRODUCTION_RUNTIME, IS_TEST_RUNTIME, OPENAI_WEBHOOK_STRICT, OUTBOUND_CALLS_ENABLED, PROVIDER_WEBHOOK_STRICT, REALTIME_INTERRUPT_RESPONSE, REALTIME_MODEL, REALTIME_NOISE_REDUCTION, RUNTIME_PORT, getPersonalizationConfig, getTelephonyRuntimeConfig, getTelnyxRuntimeConfig, getVoiceProviderName, requireRuntimeEnv } from './config.js';
 
 // ─── Security Helpers ───
 
@@ -903,7 +903,7 @@ const callAccept = {
 
       // CRM auto-lookup — runs before greeting so name/context is available immediately.
       // SQLite is synchronous and local so this resolves in <5ms — no caller-perceptible delay.
-      if (callerPhone) {
+      if (CRM_ENABLED && callerPhone) {
         const crmApiDeps = {
           clawdClient,
           operatorName: OPERATOR_NAME || '',
@@ -1141,11 +1141,12 @@ const callAccept = {
 
           writeJsonl({ type: 'c2.crm_auto_logged', call_id: callId, received_at: new Date().toISOString(), phone: callerPhone });
 
-          // Pass 2: LLM extraction — enriches name, context_notes, and summary from full transcript
-          // Fire-and-forget so it doesn't block the close handler
-          extractAndUpdateCrmFromTranscript(callId, callerPhone, writeJsonl).catch((e) => {
-            writeJsonl({ type: 'c2.crm_extract_fatal', call_id: callId, error: String(e) });
-          });
+          if (CRM_TRANSCRIPT_ENRICHMENT_ENABLED) {
+            // Pass 2: opt-in LLM extraction enriches name, context_notes, and summary from full transcript.
+            extractAndUpdateCrmFromTranscript(callId, callerPhone, writeJsonl).catch((e) => {
+              writeJsonl({ type: 'c2.crm_extract_fatal', call_id: callId, error: String(e) });
+            });
+          }
         } catch (e) {
           writeJsonl({ type: 'c2.crm_auto_log_error', call_id: callId, received_at: new Date().toISOString(), error: String(e) });
         }
@@ -2117,8 +2118,8 @@ function sanitizeSummaryJson(raw: any): Record<string, unknown> | null {
  * Reads the full call transcript and asks GPT-4o-mini to extract structured
  * contact info and personal context. Then upserts back to CRM.
  *
- * This runs after every call end, guaranteeing CRM data quality regardless of
- * whether Amber called the CRM herself during the call.
+ * This runs only when AMBER_CRM_TRANSCRIPT_ENRICHMENT=true. Keep it disabled
+ * unless the operator has caller notice/consent and retention controls in place.
  */
 async function extractAndUpdateCrmFromTranscript(
   callId: string,

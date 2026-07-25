@@ -10,6 +10,8 @@ export const OPENAI_WEBHOOK_STRICT = process.env['OPENAI_' + 'WEBHOOK_' + 'STRIC
 export const IS_PRODUCTION_RUNTIME = process.env.NODE_ENV === 'production';
 export const IS_TEST_RUNTIME = process.env.NODE_ENV === 'test';
 export const OUTBOUND_CALLS_ENABLED = process.env['AMBER_' + 'ENABLE_' + 'OUTBOUND_CALLS'] !== 'false';
+export const CRM_ENABLED = process.env['AMBER_' + 'CRM_' + 'ENABLED'] === 'true';
+export const CRM_TRANSCRIPT_ENRICHMENT_ENABLED = process.env['AMBER_' + 'CRM_' + 'TRANSCRIPT_' + 'ENRICHMENT'] === 'true';
 export const REALTIME_MODEL = process.env['AMBER_' + 'REALTIME_' + 'MODEL'] || 'gpt-realtime';
 export const REALTIME_INTERRUPT_RESPONSE = process.env['AMBER_' + 'REALTIME_' + 'INTERRUPT_RESPONSE'] !== 'false';
 export const REALTIME_NOISE_REDUCTION = process.env['AMBER_' + 'REALTIME_' + 'NOISE_REDUCTION'] || 'far_field';

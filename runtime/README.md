@@ -2,6 +2,8 @@
 
 A production-ready Twilio + OpenAI Realtime SIP bridge that enables voice conversations with an AI assistant. This bridge connects inbound/outbound phone calls to OpenAI's Realtime API and optionally integrates with OpenClaw for brain-in-loop capabilities.
 
+**Privacy and cost warning:** this runtime handles real phone calls. Call audio may pass through your voice provider and OpenAI Realtime, calls may incur carrier/API charges, and generated logs/transcripts can contain sensitive communications data. Keep `runtime/.env`, `runtime/logs/`, contact caches, and CRM files private. Configure caller notice/consent, retention/deletion, and authorized test numbers before production use.
+
 ## Features
 
 - **Bidirectional calling**: Handle both inbound call screening and outbound calls with custom objectives
@@ -161,6 +163,8 @@ When configured, the assistant can delegate complex queries (calendar lookups, c
 | `DEFAULT_CALENDAR` | Default calendar for bookings | (empty) |
 | `OPENAI_VOICE` | OpenAI TTS voice (alloy, echo, fable, onyx, nova, shimmer) | `alloy` |
 | `AMBER_REALTIME_MODEL` | Default Realtime model for calls without a per-call override (`gpt-realtime` or `gpt-realtime-mini`) | `gpt-realtime` |
+| `AMBER_CRM_ENABLED` | Enable local CRM lookup/logging. Enable only with caller notice/consent and retention policy. | `false` |
+| `AMBER_CRM_TRANSCRIPT_ENRICHMENT` | Enable post-call transcript extraction into local CRM through OpenAI Chat Completions. | `false` |
 
 ### Optional - Call Screening
 

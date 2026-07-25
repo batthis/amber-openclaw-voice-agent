@@ -2,6 +2,8 @@
 
 **A phone capability layer for [OpenClaw](https://openclaw.ai)** — gives your OpenClaw agent inbound answering, screening, confirmed scheduling, optional outbound calling, local call logs/transcripts, optional local CRM/contact memory, contacts lookup, MCP tools, and a loopback-only dashboard via a provider-swappable telephony bridge + OpenAI Realtime. Twilio is the default and recommended provider. Claude Desktop/Cowork and other MCP-capable clients or agent harnesses can use the same phone, CRM, calendar, and call-history capabilities once configured.
 
+**Privacy notice:** Amber handles real communications data. Calls may be processed by Twilio or another voice provider and OpenAI Realtime, and local logs/transcripts are sensitive. CRM persistence is opt-in with `AMBER_CRM_ENABLED=true`; transcript-based CRM enrichment is separately opt-in with `AMBER_CRM_TRANSCRIPT_ENRICHMENT=true`. Configure caller notice/consent, access controls, retention, and deletion practices before using Amber with real callers.
+
 [![ClawHub](https://img.shields.io/badge/ClawHub-amber--voice--assistant-blue)](https://clawhub.ai/skills/amber-voice-assistant)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -14,7 +16,7 @@ Amber is not just a standalone voice bot or virtual receptionist. It operates as
 - 🔉 **Inbound call screening** — greeting, message-taking, appointment booking
 - 📞 **Outbound calls** — reservations, inquiries, follow-ups with structured call plans
 - 🧠 **Brain-in-the-loop** — consults your OpenClaw gateway mid-call for calendar, contacts, preferences
-- 👤 **Built-in CRM** — maintains local, operator-reviewed caller records for relevant follow-up; caller notice, consent, retention, and correction are operator responsibilities
+- 👤 **Opt-in CRM** — maintains local, operator-reviewed caller records for relevant follow-up only when enabled; caller notice, consent, retention, and correction are operator responsibilities
 - 📊 **Call log dashboard** — browse history, transcripts, captured messages, follow-up tracking, estimated costs, and one-touch localhost test calls
 - ⚡ **Launch in minutes** — `npm install`, configure `.env`, `npm start`
 - 🔒 **Safety guardrails** — outbound calls use operator approval/confirmation gates and can be disabled with `AMBER_ENABLE_OUTBOUND_CALLS=false`; payment escalation and consent boundaries included

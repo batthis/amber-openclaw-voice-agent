@@ -20,6 +20,7 @@ This dashboard displays call logs, transcripts, captured messages, callback numb
 
 - Run the server on loopback only (`127.0.0.1`) unless you put it behind authentication, TLS, and a trusted network boundary.
 - Do not bind this dashboard to all network interfaces on an untrusted LAN or public host.
+- Bridge API tokens entered in the dashboard are used for the active page session only and are not saved to localStorage.
 - Review and delete generated dashboard data according to your caller notice, consent, and retention policy.
 - Do not commit or publish generated dashboard data, contact caches, transcripts, or call logs.
 

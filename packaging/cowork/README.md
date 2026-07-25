@@ -2,6 +2,8 @@
 
 Give Claude a phone. Amber is the first voice/telephony plugin for Claude — make and receive real phone calls, screen incoming calls with an AI receptionist, book appointments, and manage contacts.
 
+**Privacy notice:** Amber processes real caller audio/metadata through your configured voice provider and OpenAI, and can create local logs, transcripts, contact caches, and optional CRM records. Enable contact sync and CRM only after you understand where the data is stored and have caller notice/consent, retention, and deletion practices in place.
+
 ## What it does
 
 - **Make calls** — `/amber:call +14165551234 "Book a table for 4 at 7pm"` and Amber handles the conversation
@@ -33,7 +35,7 @@ Give Claude a phone. Amber is the first voice/telephony plugin for Claude — ma
    - Configure ngrok for webhook tunneling
    - Compile native macOS tools (Calendar access)
    - Ask if you're setting up for **Claude Desktop / Cowork** — say **yes**
-   - Sync your Apple Contacts to a local cache for contact lookups
+   - Optionally sync your Apple Contacts to a local cache for contact lookups. This copies personal contact data to the runtime host; keep the cache private and delete/regenerate it when no longer needed.
    - Generate a `.env` file
 
 3. Build and start the bridge:

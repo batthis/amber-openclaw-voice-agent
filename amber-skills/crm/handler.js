@@ -41,6 +41,7 @@ function getDb() {
     
     // Open DB with WAL mode for concurrent reads + serialized writes
     _db = new Database(dbPath, { verbose: null });
+    try { fs.chmodSync(dbPath, 0o600); } catch (_) {}
     _db.pragma('journal_mode = WAL');
     _db.pragma('foreign_keys = ON');
     

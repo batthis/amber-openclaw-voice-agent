@@ -687,10 +687,11 @@
 
     function saveSettings() {
       readSettingsFromForm();
-      localStorage.setItem('calllog-settings', JSON.stringify(settings));
+      const { bridgeToken, ...persistedSettings } = settings;
+      localStorage.setItem('calllog-settings', JSON.stringify(persistedSettings));
       updateStats();
       applyFilters();
-      showCallStatus('Settings saved.', '#8ff0b2');
+      showCallStatus('Settings saved. Bridge token stays in memory only.', '#8ff0b2');
     }
 
     function showCallStatus(msg, color = '#ffb86b') {
