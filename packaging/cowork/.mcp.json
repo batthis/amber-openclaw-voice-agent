@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "amber-voice": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/../../runtime/dist/mcp-server.js"],
+      "env": {
+        "AMBER_BRIDGE_URL": "http://127.0.0.1:8000",
+        "BRIDGE_API_TOKEN": "",
+        "OPERATOR_NAME": "",
+        "TWILIO_ACCOUNT_SID": "",
+        "TWILIO_AUTH_TOKEN": "",
+        "TWILIO_CALLER_ID": "",
+        "OPENAI_API_KEY": "",
+        "OPENAI_PROJECT_ID": "",
+        "NGROK_AUTHTOKEN": ""
+      }
+    }
+  }
+}

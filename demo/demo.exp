@@ -1,0 +1,98 @@
+#!/usr/bin/expect -f
+# Expect script to automate the Amber setup wizard demo
+
+set timeout 10
+spawn node /tmp/amber-wizard-test/demo-wizard.js
+
+# Wait for intro
+expect "Press Enter to accept defaults"
+send "\r"
+
+# Twilio config
+expect "Account SID"
+send "AC1234567890abcdef1234567890abcd\r"
+
+expect "Auth Token"
+send "demo_auth_token_abc123xyz\r"
+
+# Wait for validation spinner
+sleep 1
+
+expect "Twilio phone number"
+send "+15551234567\r"
+
+# OpenAI config
+expect "API Key"
+send "<openai-api-key>\r"
+
+# Wait for validation
+sleep 1
+
+expect "Project ID"
+send "proj_demo1234567890abcdef\r"
+
+# Wait for validation
+sleep 0.5
+
+expect "Webhook Secret"
+send "<openai-webhook-secret>\r"
+
+# Wait for validation
+sleep 0.5
+
+expect "Voice"
+send "alloy\r"
+
+# Server config
+expect "Port"
+send "8000\r"
+
+expect "Use https://abc123.ngrok.io"
+send "y\r"
+
+# OpenClaw
+expect "Configure OpenClaw integration"
+send "n\r"
+
+# Personalization
+expect "Customize assistant identity"
+send "y\r"
+
+expect "Assistant name"
+send "Amber\r"
+
+expect "Operator name"
+send "John Smith\r"
+
+expect "Operator phone"
+send "+15559876543\r"
+
+expect "Operator email"
+send "john@example.com\r"
+
+expect "Organization name"
+send "Acme Corp\r"
+
+expect "Default calendar name"
+send "Work\r"
+
+# Call screening
+expect "Configure GenZ-style"
+send "n\r"
+
+# Post-setup
+expect "Run npm install"
+send "y\r"
+
+sleep 2
+
+expect "Run npm run build"
+send "y\r"
+
+sleep 2
+
+# Wait for completion
+expect "All Done"
+sleep 2
+
+expect eof
