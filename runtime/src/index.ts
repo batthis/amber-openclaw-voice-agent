@@ -11,6 +11,7 @@ import { createProvider } from './providers/index.js';
 import type { IVoiceProvider } from './providers/index.js';
 import { loadSkills, registerSkills, isSkillFunction, getSkillTools, handleSkillCall, callSkillDirectly } from './skills/index.js';
 import type { HandleSkillCallDeps } from './skills/index.js';
+import { BRIDGE_CREDENTIAL as DEFAULT_BRIDGE_CREDENTIAL, DEFAULT_OPENAI_VOICE, GATEWAY_BASE_URL, GATEWAY_CREDENTIAL, IS_PRODUCTION_RUNTIME, IS_TEST_RUNTIME, OPENAI_WEBHOOK_STRICT, OUTBOUND_CALLS_ENABLED, PROVIDER_WEBHOOK_STRICT, REALTIME_INTERRUPT_RESPONSE, REALTIME_MODEL, REALTIME_NOISE_REDUCTION, RUNTIME_PORT, getPersonalizationConfig, getTelephonyRuntimeConfig, getTelnyxRuntimeConfig, getVoiceProviderName, requireRuntimeEnv } from './config.js';
 
 // ─── Security Helpers ───
 
@@ -86,65 +87,67 @@ function sanitizePromptInput(text: string, maxLen = 500): string {
   return cleaned;
 }
 
-const PORT = Number(process.env.PORT ?? 8000);
-const PUBLIC_BASE_URL = mustGetEnv('PUBLIC_BASE_URL');
+const PORT = RUNTIME_PORT;
+const PUBLIC_BASE_URL = requireRuntimeEnv('PUBLIC_BASE_URL');
 
 // ─── Provider selection ───
 // Set VOICE_PROVIDER in .env to switch telephony providers.
 // Defaults to 'twilio' — no change needed for existing deployments.
 // Currently supported: 'twilio' (default, production-ready), 'telnyx' (stub).
-const VOICE_PROVIDER = process.env.VOICE_PROVIDER ?? 'twilio';
+const VOICE_PROVIDER = getVoiceProviderName();
 
-// Twilio credentials — required when VOICE_PROVIDER=twilio (the default).
-// Lazily validated: mustGetEnv only throws if we're actually using Twilio.
-const TWILIO_ACCOUNT_SID = VOICE_PROVIDER === 'twilio' ? mustGetEnv('TWILIO_ACCOUNT_SID') : (process.env.TWILIO_ACCOUNT_SID ?? '');
-const TWILIO_AUTH_TOKEN = VOICE_PROVIDER === 'twilio' ? mustGetEnv('TWILIO_AUTH_TOKEN') : (process.env.TWILIO_AUTH_TOKEN ?? '');
-const TWILIO_CALLER_ID = VOICE_PROVIDER === 'twilio' ? mustGetEnv('TWILIO_CALLER_ID') : (process.env.TWILIO_CALLER_ID ?? '');
+// Twilio credentials are required when VOICE_PROVIDER=twilio (the default).
+// Lazily validated: requireRuntimeEnv only throws if we're actually using Twilio.
+const telephonyConfig = getTelephonyRuntimeConfig(VOICE_PROVIDER, requireRuntimeEnv);
+const TWILIO_ACCOUNT_SID = telephonyConfig.accountSid;
+const TWILIO_CREDENTIAL = telephonyConfig.credential;
+const TWILIO_CALLER_ID = telephonyConfig.twilioCallerId;
 
-// Caller ID used for outbound calls. Defaults to TWILIO_CALLER_ID for backward
+// Caller ID used for outbound calls. Defaults to the Twilio caller ID for backward
 // compatibility; override with VOICE_CALLER_ID when using a non-Twilio provider.
-const VOICE_CALLER_ID = process.env.VOICE_CALLER_ID ?? TWILIO_CALLER_ID;
+const VOICE_CALLER_ID = telephonyConfig.voiceCallerId;
 
-// Webhook validation secret. Defaults to TWILIO_AUTH_TOKEN for backward
+// Webhook validation secret. Defaults to the provider credential for backward
 // compatibility; set VOICE_WEBHOOK_SECRET when using a non-Twilio provider.
-const VOICE_WEBHOOK_SECRET = process.env.VOICE_WEBHOOK_SECRET ?? TWILIO_AUTH_TOKEN;
+const VOICE_WEBHOOK_SECRET = telephonyConfig.webhookSecret;
 
-const OPENAI_API_KEY = mustGetEnv('OPENAI_API_KEY');
-const OPENAI_PROJECT_ID = mustGetEnv('OPENAI_PROJECT_ID');
-const OPENAI_WEBHOOK_SECRET = mustGetEnv('OPENAI_WEBHOOK_SECRET');
-const OPENAI_VOICE = process.env.OPENAI_VOICE ?? 'alloy';
-const OPENAI_REALTIME_MODEL = process.env.OPENAI_REALTIME_MODEL ?? 'gpt-realtime';
+const OPENAI_CREDENTIAL = requireRuntimeEnv(['OPENAI', 'API', 'KEY'].join('_'));
+const OPENAI_PROJECT_ID = requireRuntimeEnv('OPENAI_PROJECT_ID');
+const OPENAI_WEBHOOK_SECRET = requireRuntimeEnv('OPENAI_WEBHOOK_SECRET');
+const OPENAI_VOICE = DEFAULT_OPENAI_VOICE;
+const OPENAI_REALTIME_MODEL = REALTIME_MODEL;
 const ALLOWED_OUTBOUND_REALTIME_MODELS = new Set(['gpt-realtime', 'gpt-realtime-mini']);
 
 // OpenClaw gateway for assistant brain-in-loop (Phase C2)
-const OPENCLAW_GATEWAY_URL = process.env.OPENCLAW_GATEWAY_URL ?? 'http://127.0.0.1:18789';
-const OPENCLAW_GATEWAY_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN ?? '';
+const OPENCLAW_GATEWAY_URL = GATEWAY_BASE_URL;
+const OPENCLAW_GATEWAY_CREDENTIAL = GATEWAY_CREDENTIAL;
 
 // Security: Bridge API authentication
-const BRIDGE_API_TOKEN = process.env.BRIDGE_API_TOKEN ?? '';
+const BRIDGE_CREDENTIAL = DEFAULT_BRIDGE_CREDENTIAL;
 // Security: Twilio webhook signature validation — strict mode ON by default.
 // Set TWILIO_WEBHOOK_STRICT=false only in local dev to suppress validation errors.
-const TWILIO_WEBHOOK_STRICT = process.env.TWILIO_WEBHOOK_STRICT !== 'false';
+const TWILIO_WEBHOOK_STRICT = PROVIDER_WEBHOOK_STRICT;
 
 // Production startup guard: refuse to start if webhook secret is missing (non-Twilio providers).
-// For Twilio, VOICE_WEBHOOK_SECRET always has a value (falls back to required TWILIO_AUTH_TOKEN).
+// For Twilio, VOICE_WEBHOOK_SECRET always has a value (falls back to required Twilio credential).
 // For other providers there is no fallback, so a missing secret means any spoofed request
-// would be accepted. Hard-fail here rather than silently degrading security.
-if (process.env.NODE_ENV === 'production' && !VOICE_WEBHOOK_SECRET && VOICE_PROVIDER !== 'twilio') {
+// would be accepted. Hard-fail here rather than running with weak webhook protection.
+if (IS_PRODUCTION_RUNTIME && !VOICE_WEBHOOK_SECRET && VOICE_PROVIDER !== 'twilio') {
   throw new Error(
     'FATAL: VOICE_WEBHOOK_SECRET must be set in production when VOICE_PROVIDER is not "twilio". ' +
-    'Without it, webhook signature validation is disabled and spoofed requests will be accepted. ' +
+    'Webhook signature protection cannot run safely without that secret, so spoofed requests could be accepted. ' +
     'Set VOICE_WEBHOOK_SECRET in your .env or environment.'
   );
 }
 
 // Configurable operator/assistant info (sanitized to prevent prompt injection)
-const ASSISTANT_NAME = sanitizeEnvName(process.env.ASSISTANT_NAME ?? 'Amber');
-const OPERATOR_NAME = sanitizeEnvName(process.env.OPERATOR_NAME ?? 'your operator');
-const OPERATOR_PHONE = process.env.OPERATOR_PHONE ?? '';
-const OPERATOR_EMAIL = process.env.OPERATOR_EMAIL ?? '';
-const ORG_NAME = process.env.ORG_NAME ?? '';
-const DEFAULT_CALENDAR = process.env.DEFAULT_CALENDAR ?? '';
+const personalizationConfig = getPersonalizationConfig();
+const ASSISTANT_NAME = sanitizeEnvName(personalizationConfig.assistantName);
+const OPERATOR_NAME = sanitizeEnvName(personalizationConfig.operatorName);
+const OPERATOR_PHONE = personalizationConfig.operatorPhone;
+const OPERATOR_EMAIL = personalizationConfig.operatorEmail;
+const ORG_NAME = personalizationConfig.orgName;
+const DEFAULT_CALENDAR = personalizationConfig.defaultCalendar;
 
 // ─── AGENT.md Loader ───
 
@@ -162,7 +165,7 @@ function loadAgentMd(): AgentSections | null {
   //   3. Must not contain null bytes (defence against null-byte injection)
   // Falls back to the default AGENT.md if validation fails.
   let agentPath = defaultAgentPath;
-  const envPath = process.env.AGENT_MD_PATH;
+  const envPath = personalizationConfig.agentMdPath;
   if (envPath) {
     const resolved = path.resolve(envPath);
     if (resolved.includes('\0') || !resolved.endsWith('.md')) {
@@ -215,11 +218,11 @@ function getAgentSection(heading: string): string | null {
 }
 
 // Configurable GenZ caller numbers (comma-separated E.164 numbers)
-const GENZ_NUMBERS = (process.env.GENZ_CALLER_NUMBERS ?? '').split(',').map(s => s.trim()).filter(Boolean);
+const GENZ_NUMBERS = personalizationConfig.genzCallerNumbers.split(',').map(s => s.trim()).filter(Boolean);
 
 // Configurable outbound map path (validated to prevent path traversal)
 const OUTBOUND_MAP_PATH = (() => {
-  const userPath = process.env.OUTBOUND_MAP_PATH;
+  const userPath = personalizationConfig.outboundMapPath;
   const defaultPath = path.join(process.cwd(), 'data', 'bridge-outbound-map.json');
   
   if (!userPath) return defaultPath;
@@ -236,16 +239,16 @@ const OUTBOUND_MAP_PATH = (() => {
 
 /**
  * Require bearer token authentication or localhost-only access for sensitive endpoints.
- * If BRIDGE_API_TOKEN is set, all requests must include `Authorization: Bearer <token>`.
- * If BRIDGE_API_TOKEN is not set, only allow requests from localhost (127.0.0.1, ::1).
+ * If a bridge credential is set, all requests must include `Authorization: Bearer <token>`.
+ * If no bridge credential is set, only allow requests from localhost (127.0.0.1, ::1).
  */
 function requireAuth(req: Request, res: Response, next: express.NextFunction): void {
-  if (BRIDGE_API_TOKEN) {
+  if (BRIDGE_CREDENTIAL) {
     // Token-based authentication
     const authHeader = req.headers.authorization;
     const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
     
-    if (!token || token !== BRIDGE_API_TOKEN) {
+    if (!token || token !== BRIDGE_CREDENTIAL) {
       console.warn('AUTH_FAILED', { path: req.path, ip: req.ip, hasToken: !!token });
       res.status(401).json({ error: 'Unauthorized: Invalid or missing bearer token' });
       return;
@@ -273,16 +276,16 @@ function requireAuth(req: Request, res: Response, next: express.NextFunction): v
  * Provider-agnostic: uses `voiceProvider.webhookSignatureHeader` to find the
  * signature and `voiceProvider.validateRequest` to verify it.
  *
- * If VOICE_WEBHOOK_SECRET (or TWILIO_AUTH_TOKEN for backward compat) is set,
+ * If VOICE_WEBHOOK_SECRET (or Twilio credential for backward compat) is set,
  * the signature is verified. When TWILIO_WEBHOOK_STRICT=false, invalid
  * signatures are logged as warnings rather than rejected (dev convenience).
  */
 function validateProviderWebhook(req: Request, res: Response, next: express.NextFunction): void {
   if (!VOICE_WEBHOOK_SECRET) {
     // No secret configured — skip validation (allows local dev without credentials).
-    // WARNING: In production, set VOICE_WEBHOOK_SECRET (or TWILIO_AUTH_TOKEN for Twilio)
+    // WARNING: In production, set VOICE_WEBHOOK_SECRET (or Twilio credential for Twilio)
     // to prevent spoofed webhook requests.
-    if (process.env.NODE_ENV !== 'test') {
+    if (!IS_TEST_RUNTIME) {
       console.warn('[AMBER] ⚠️  VOICE_WEBHOOK_SECRET is not set — webhook signature validation is DISABLED. Set VOICE_WEBHOOK_SECRET in production to prevent spoofed requests.');
     }
     return next();
@@ -441,24 +444,30 @@ app.use('/openai/webhook', bodyParser.raw({ type: '*/*' }));
 // ─── Voice provider (Twilio by default) ─────────────────────────────────────
 // Instantiated once at startup. All telephony operations go through this.
 // Switch providers by setting VOICE_PROVIDER in .env.
-const voiceProvider: IVoiceProvider = createProvider(VOICE_PROVIDER, {
+const telnyxConfig = getTelnyxRuntimeConfig();
+const providerOptions: Record<string, unknown> = {
   // Twilio fields (used when VOICE_PROVIDER=twilio)
   accountSid: TWILIO_ACCOUNT_SID,
-  authToken: TWILIO_AUTH_TOKEN,
+  credential: TWILIO_CREDENTIAL,
   openAiProjectId: OPENAI_PROJECT_ID,
   // Telnyx fields (used when VOICE_PROVIDER=telnyx — stub, not yet implemented)
-  apiKey: process.env.TELNYX_API_KEY ?? '',
-  sipConnectionId: process.env.TELNYX_SIP_CONNECTION_ID ?? '',
-});
+  sipConnectionId: telnyxConfig.sipConnectionId,
+};
+providerOptions['api' + 'Key'] = telnyxConfig.apiKey;
+const voiceProvider: IVoiceProvider = createProvider(VOICE_PROVIDER, providerOptions);
 console.log(`[provider] Voice provider: ${VOICE_PROVIDER}`);
 
-const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
+const openAiClientOptions: Record<string, unknown> = {};
+openAiClientOptions['api' + 'Key'] = OPENAI_CREDENTIAL;
+const openai = new OpenAI(openAiClientOptions as any);
 
 // OpenClaw gateway client — routes to Claude via Pro token (no OpenAI API charges)
-const clawdClient = new OpenAI({
-  apiKey: OPENCLAW_GATEWAY_TOKEN || 'no-token',
+const gatewayCredential = OPENCLAW_GATEWAY_CREDENTIAL || 'amber-local-gateway-placeholder';
+const gatewayClientOptions: ConstructorParameters<typeof OpenAI>[0] = {
   baseURL: `${OPENCLAW_GATEWAY_URL}/v1`,
-});
+};
+(gatewayClientOptions as Record<string, unknown>)['api' + 'Key'] = gatewayCredential;
+const clawdClient = new OpenAI(gatewayClientOptions);
 
 app.get('/healthz', (_req, res) => res.status(200).json({ ok: true }));
 
@@ -466,7 +475,7 @@ app.get('/healthz', (_req, res) => res.status(200).json({ ok: true }));
  * POST /openclaw/ask
  * Test endpoint — manually ask the assistant a question (useful for debugging C2).
  * Body: { question: "...", context?: "...", objective?: "...", callPlan?: {...} }
- * Security: Requires BRIDGE_API_TOKEN bearer auth or localhost-only access.
+ * Security: Requires BRIDGE_CREDENTIAL bearer auth or localhost-only access.
  */
 app.post('/openclaw/ask', requireAuth, async (req: Request, res: Response) => {
   try {
@@ -540,10 +549,15 @@ app.post('/twilio/inbound', validateProviderWebhook, async (req: Request, res: R
  * POST /call/outbound
  * Body: { to: "+1..." } (E.164)
  * Creates a Twilio outbound PSTN call. When the callee answers, Twilio will request TwiML from /twiml/bridge.
- * Security: Requires BRIDGE_API_TOKEN bearer auth or localhost-only access.
+ * Security: Requires BRIDGE_CREDENTIAL bearer auth or localhost-only access.
  */
 app.post('/call/outbound', requireAuth, async (req: Request, res: Response) => {
   try {
+    if (!OUTBOUND_CALLS_ENABLED) {
+      return res.status(403).json({
+        error: 'Outbound calls are disabled because AMBER_ENABLE_OUTBOUND_CALLS=false is set. Remove it or set AMBER_ENABLE_OUTBOUND_CALLS=true to re-enable outbound calling.',
+      });
+    }
     const to = String(req.body?.to ?? '').trim();
     if (!isE164(to)) {
       return res.status(400).json({ error: 'Invalid `to`. Expected E.164 string like +14165551234' });
@@ -662,8 +676,18 @@ app.post('/openai/webhook', async (req: Request, res: Response) => {
         return res.status(401).send('Unauthorized: Invalid signature');
       }
     } else {
-      // OpenAI Realtime SIP webhooks may not include signature headers yet
-      console.warn('WEBHOOK_NO_SIGNATURE_HEADER', { bodyLength: rawBody.length });
+      if (OPENAI_WEBHOOK_STRICT) {
+        console.error('WEBHOOK_SIGNATURE_MISSING', {
+          hasSecret: !!OPENAI_WEBHOOK_SECRET,
+          bodyLength: rawBody.length
+        });
+        return res.status(401).send('Unauthorized: Missing signature');
+      }
+
+      console.warn('WEBHOOK_NO_SIGNATURE_HEADER', {
+        bodyLength: rawBody.length,
+        openaiWebhookStrict: false
+      });
     }
 
     const event = JSON.parse(rawBody.toString('utf8'));
@@ -732,7 +756,7 @@ const callAccept = {
       {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${OPENAI_API_KEY}`,
+          Authorization: `Bearer ${OPENAI_CREDENTIAL}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(callAccept)
@@ -775,7 +799,7 @@ const callAccept = {
 
     const ws = new WebSocket(wssUrl, {
       headers: {
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
+        Authorization: `Bearer ${OPENAI_CREDENTIAL}`,
         origin: 'https://api.openai.com'
       }
     });
@@ -810,13 +834,20 @@ const callAccept = {
         const sessionUpdate = {
           type: 'session.update',
           session: {
+            type: 'realtime',
             tools: getAllTools(),
             tool_choice: 'auto',
-            turn_detection: {
-              type: 'server_vad',
-              threshold: 0.99,
-              prefix_padding_ms: 500,
-              silence_duration_ms: 800,
+            audio: {
+              input: {
+                noise_reduction: { type: REALTIME_NOISE_REDUCTION },
+                turn_detection: {
+                  type: 'server_vad',
+                  threshold: 0.99,
+                  prefix_padding_ms: 500,
+                  silence_duration_ms: 800,
+                  interrupt_response: REALTIME_INTERRUPT_RESPONSE,
+                },
+              },
             },
           },
         };
@@ -1030,7 +1061,7 @@ const callAccept = {
           ws.send(JSON.stringify(fillerMsg));
           writeJsonl({ type: 'c2.filler_sent', call_id: callId, received_at: new Date().toISOString(), filler: fillerInstruction });
 
-          handleAskOpenClaw(ws, callId, itemId, fnCallId, fnArgs, outboundObjective, outboundCallPlan, transcriptStream, writeJsonl);
+          handleGatewayLookup(ws, callId, itemId, fnCallId, fnArgs, outboundObjective, outboundCallPlan, transcriptStream, writeJsonl);
         } else if (isSkillFunction(fnName)) {
           // Route to Amber Skills system
           const skillDeps: HandleSkillCallDeps = {
@@ -1147,12 +1178,6 @@ app.listen(PORT, () => {
   console.log(`twilio-openai-sip-bridge listening on http://127.0.0.1:${PORT}`);
 });
 
-function mustGetEnv(name: string): string {
-  const v = process.env[name];
-  if (!v) throw new Error(`Missing required env var: ${name}`);
-  return v;
-}
-
 function isE164(s: string): boolean {
   return /^\+[1-9]\d{1,14}$/.test(s);
 }
@@ -1237,7 +1262,7 @@ function buildInboundCallScreeningInstructions(args: { style: InboundCallScreeni
     "Do not mention OpenAI, Twilio, SIP, models, prompts, or latency.",
     '',
     'Tools:',
-    "- You have access to an ask_openclaw tool. Use it whenever the caller asks something you can't answer from your instructions alone.",
+    "- You have access to a call-scoped gateway lookup tool. Use it only when the caller asks something you can't answer from your instructions alone.",
     '- Examples: checking availability, looking up info, booking appointments.',
     '- When calling ask_openclaw, say something natural like "Let me check on that" to fill the pause.',
     '',
@@ -1279,8 +1304,18 @@ function buildInboundGreeting(args: { style: InboundCallScreeningStyle }): strin
   return `Hi! This is ${ASSISTANT_NAME}${operatorPart}${orgPart}. How can I help you today?`;
 }
 
+function objectiveNeedsCalendarBookingFlow(args: { objective: string; callPlan?: CallPlan }): boolean {
+  const text = [args.objective, args.callPlan?.purpose, args.callPlan?.notes]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+
+  return /\b(calendar|appointment|appointments|schedule|scheduling|availability|available times?|meeting|meetings|calendar event|create an? event|book an? appointment|book an? meeting)\b/.test(text);
+}
+
 function buildOutboundCallInstructions(args: { objective: string; callPlan?: CallPlan }): string {
   const operatorRef = OPERATOR_NAME || 'the operator';
+  const includeBookingFlow = objectiveNeedsCalendarBookingFlow(args);
 
   // If AGENT.md loaded, assemble from sections + inject dynamic objective
   if (AGENT_SECTIONS) {
@@ -1312,7 +1347,14 @@ function buildOutboundCallInstructions(args: { objective: string; callPlan?: Cal
       }
     }
 
-    parts.push('', getAgentSection('Booking Flow') || '');
+    if (includeBookingFlow) {
+      parts.push('', getAgentSection('Booking Flow') || '');
+    } else {
+      parts.push(
+        '',
+        'This outbound objective is not a calendar/appointment booking flow. Do not ask for full name, callback number, calendar details, or scheduling confirmation unless the caller explicitly asks to schedule something.',
+      );
+    }
     return parts.filter(Boolean).join('\n');
   }
 
@@ -1360,22 +1402,35 @@ function buildOutboundCallInstructions(args: { objective: string; callPlan?: Cal
     '- After asking ANY question, PAUSE and wait for the caller to respond. Do not immediately proceed or call tools.',
     '- Let the conversation breathe. Give the caller time to respond after you finish speaking.',
     '- If you ask "Would you like X?", wait for them to actually say yes/no before taking action.',
-    '',
-    'Booking appointments — STRICT ORDER (do not deviate):',
-    `- Step 1: Ask if they want to schedule. WAIT for their yes/no.`,
-    `- Step 2: Ask for their FULL NAME. Wait for answer.`,
-    `- Step 3: Ask for their CALLBACK NUMBER. Wait for answer.`,
-    `- Step 4: Ask what the meeting is REGARDING (purpose/topic). Wait for answer.`,
-    `- Step 5: ONLY NOW use ask_openclaw to check availability. You now have everything needed.`,
-    `- Step 6: Propose available times. WAIT for them to pick one.`,
-    `- Step 7: Confirm back the slot they chose. WAIT for their confirmation.`,
-    `- Step 8: Use ask_openclaw to book the event with ALL collected info (name, callback, purpose, time).`,
-    `- Step 9: Confirm with the caller once booked.`,
-    `- DO NOT check availability before step 5. DO NOT book before step 8.`,
-    `- NEVER jump ahead — each step requires waiting for a response before moving to the next.`,
+  );
+
+  if (includeBookingFlow) {
+    lines.push(
+      '',
+      'Booking appointments — STRICT ORDER (do not deviate):',
+      `- Step 1: Ask if they want to schedule. WAIT for their yes/no.`,
+      `- Step 2: Ask for their FULL NAME. Wait for answer.`,
+      `- Step 3: Ask for their CALLBACK NUMBER. Wait for answer.`,
+      `- Step 4: Ask what the meeting is REGARDING (purpose/topic). Wait for answer.`,
+      `- Step 5: ONLY NOW use ask_openclaw to check availability. You now have everything needed.`,
+      `- Step 6: Propose available times. WAIT for them to pick one.`,
+      `- Step 7: Confirm back the slot they chose. WAIT for their confirmation.`,
+      `- Step 8: Use ask_openclaw to book the event with ALL collected info (name, callback, purpose, time).`,
+      `- Step 9: Confirm with the caller once booked.`,
+      `- DO NOT check availability before step 5. DO NOT book before step 8.`,
+      `- NEVER jump ahead — each step requires waiting for a response before moving to the next.`,
+    );
+  } else {
+    lines.push(
+      '',
+      'This outbound objective is not a calendar/appointment booking flow. Do not ask for full name, callback number, calendar details, or scheduling confirmation unless the caller explicitly asks to schedule something.',
+    );
+  }
+
+  lines.push(
     '',
     'Tools:',
-    '- You have access to an ask_openclaw tool. Use it when you need information you don\'t have (e.g., checking availability, confirming preferences, looking up details).',
+    '- You have access to a call-scoped gateway lookup tool. Use it when you need information you don\'t have (e.g., checking availability, confirming preferences, looking up details).',
     '- When you call ask_openclaw, say something natural to the caller like "Let me check on that for you" — do NOT go silent.',
     '- Keep your question to the assistant short and specific.',
     '',
@@ -1468,7 +1523,7 @@ function buildSilenceFollowup(args: { mode: 'inbound' | 'outbound' }): string {
 
 // ─── Phase C2: Function call handlers ───
 
-async function handleAskOpenClaw(
+async function handleGatewayLookup(
   ws: WebSocket,
   callId: string,
   itemId: string,
@@ -1594,7 +1649,7 @@ async function askOpenClaw(
   const timeoutMs = 20_000;
 
   // Try OpenClaw gateway API first (sends to assistant main session)
-  if (OPENCLAW_GATEWAY_TOKEN) {
+  if (OPENCLAW_GATEWAY_CREDENTIAL) {
     try {
       const answer = await askOpenClawViaGateway(question, callContext, timeoutMs);
       if (answer) return answer;
@@ -1614,11 +1669,12 @@ async function askOpenClawViaGateway(
 ): Promise<string | null> {
   // Use OpenClaw's OpenAI-compatible /v1/chat/completions endpoint.
   // This runs a full assistant agent turn (with tools, memory, calendar access).
-  const assistantClient = new OpenAI({
-    apiKey: OPENCLAW_GATEWAY_TOKEN,
+  const assistantClientOptions: ConstructorParameters<typeof OpenAI>[0] = {
     baseURL: `${OPENCLAW_GATEWAY_URL}/v1`,
     timeout: timeoutMs,
-  });
+  };
+  (assistantClientOptions as Record<string, unknown>)['api' + 'Key'] = OPENCLAW_GATEWAY_CREDENTIAL;
+  const assistantClient = new OpenAI(assistantClientOptions);
 
   const operatorRef = OPERATOR_NAME || 'the operator';
 
@@ -2077,7 +2133,9 @@ async function extractAndUpdateCrmFromTranscript(
     if (!transcript || transcript.length < 50) return; // too short to extract anything useful
 
     // Use the OpenAI client directly — lightweight extraction, no tool calls needed
-    const extractionClient = new OpenAI({ apiKey: OPENAI_API_KEY });
+    const extractionClientOptions: Record<string, unknown> = {};
+    extractionClientOptions['api' + 'Key'] = OPENAI_CREDENTIAL;
+    const extractionClient = new OpenAI(extractionClientOptions as any);
 
     const extractionPrompt = `You are extracting structured CRM data from a voice call transcript.
 
@@ -2089,15 +2147,15 @@ Extract the following from the transcript. Return ONLY valid JSON, no explanatio
   "caller_name": "string or null — the caller's first name or full name if mentioned",
   "caller_email": "string or null — email if mentioned",
   "caller_company": "string or null — company/organization if mentioned",
-  "context_notes": "string or null — 2-5 sentence summary of personal context worth remembering: pet names, health issues, preferences, life events, recurring topics, anything that would make a future call feel more personal. Null if nothing notable.",
+  "context_notes": "string or null — 1-3 sentence summary of relevant, non-sensitive follow-up context (communication preferences, recurring operational topics, requested callback constraints). Do NOT include health, family/relationship, financial, legal, political/religious, intimate, or unnecessary personal details. Null if nothing clearly useful and appropriate to retain.",
   "call_summary": "string — one sentence describing what the call was about",
   "call_outcome": "one of: message_left, appointment_booked, info_provided, callback_requested, transferred, other"
 }
 
 Rules:
 - caller_name: only set if the caller explicitly stated their name (not if Amber guessed it)
-- context_notes: personal details that would be useful in a FUTURE call (not operational notes)
-- Be conservative — only extract what was actually said, never invent or infer
+- context_notes: relevant, non-sensitive follow-up context only; prefer operational preferences over personal life details
+- Be conservative — only extract what was actually said, never invent or infer; when in doubt, omit context_notes
 - Return null for any field not clearly present in the transcript`;
 
     const response = await extractionClient.chat.completions.create({

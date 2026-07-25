@@ -5,11 +5,13 @@ runtime/node_modules/
 runtime/.env
 runtime/data/
 runtime/logs/
-runtime/package-lock.json
 *.log
 .DS_Store
 
-# Dashboard runtime data (call logs, transcripts — PII, never commit or publish)
+# Runtime/call data (call logs, transcripts — PII, never commit or publish)
+data/
+dashboard/data-tmp-bridge/
+tmp-bridge-logs
 dashboard/data/calls.json
 dashboard/data/calls.js
 dashboard/data/meta.json

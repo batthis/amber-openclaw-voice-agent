@@ -9,6 +9,9 @@ A beautiful web dashboard for viewing and managing call logs from the Amber Voic
 - 📊 Statistics and filtering
 - 🔍 Search by name, number, or transcript content
 - 🔔 Follow-up tracking with localStorage persistence
+- ☎️ One-touch localhost test calls through the Amber bridge
+- 💵 Editable cost estimates from call duration and Realtime token usage
+- 🎚️ Per-test-call Realtime model switch for regular or mini
 - ⚡ Auto-refresh when data changes (every 30s)
 
 ## Privacy and Access Control
@@ -112,7 +115,7 @@ node scripts/serve.js --port 8080 --host 127.0.0.1
 
 **Option 2: File Protocol**
 
-Open `index.html` directly in your browser. The dashboard works with `file://` URLs.
+Open `index.html` directly in your browser. Browsing, filtering, and transcript views work with `file://` URLs. One-touch test calls require the local HTTP server above so `/api/call` can proxy safely to the loopback Amber bridge.
 
 ### 5. Auto-Update (Optional)
 
@@ -133,6 +136,8 @@ node scripts/watch.js --logs /path/to/logs --out /path/to/data --interval-ms 200
 - **Stats Cards:** Click to filter by type (inbound, outbound, messages, etc.)
 - **Search:** Filter by name, number, transcript content, or Call SID
 - **Follow-ups:** Click 🔔 icon on any call to mark for follow-up
+- **One-Touch Call:** Enter a test number/objective, choose regular or mini model, and start a local bridge call
+- **Cost Visibility:** Adjust local rate settings to estimate telephony and Realtime model spend
 - **Refresh:** Click ↻ button or wait for auto-refresh (30s)
 - **Transcript:** Click "Transcript" to expand full conversation
 

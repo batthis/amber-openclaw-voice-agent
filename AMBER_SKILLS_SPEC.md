@@ -43,7 +43,7 @@ This means safety-critical actions (e.g., sending messages) cannot be invoked by
 - Tools are defined in `OPENCLAW_TOOLS` array (line ~313) — currently just `ask_openclaw`
 - Tools registered with OpenAI Realtime session at line ~665 and ~749
 - Function calls handled at line ~862+ — currently only `ask_openclaw` is recognized
-- `ask_openclaw` dispatches to `handleAskOpenClaw()` which calls OpenClaw gateway
+- Gateway lookups are routed through Amber's call-scoped OpenClaw bridge helper
 - Calendar lookups currently go through `ask_openclaw` → OpenClaw gateway → Jarvis → ical-query
 - A `clawdClient` (OpenAI-compatible, pointed at OpenClaw gateway) exists at module level (~line 413)
 - `sendFunctionCallOutput(ws, fnCallId, result)` sends function results back to Realtime API
@@ -201,13 +201,13 @@ export interface LoadedSkill {
 
 **Note on confirmation flow:**
 Confirmation for `act` skills is enforced programmatically at the router level — not left to LLM prompting.
-The router rejects any `act` skill call where `confirmed !== true` unless the skill explicitly sets
-`confirmation_required: false` in its manifest (reserved for non-destructive actions only).
+The router rejects any `act` skill call where `confirmed !== true` unless the skill manifest opts out
+by setting its confirmation flag to false. Reserve that opt-out for non-destructive actions only.
 - Set `confirmation_required: true` (or omit it — true is the default) for any action with side effects
 - Include `confirmed` as a required boolean parameter in `function_schema.parameters`
 - The function description should also prompt the model to confirm with the caller first, as an
   additional layer — but the router enforcement is the authoritative gate, not the model prompt
-- This puts confirmation in the LLM layer, not the router layer (simpler, reliable enough for V1)
+- Confirmation is therefore enforced in code at the router layer; the LLM prompt is only a user-experience cue.
 
 ### 4. api.ts
 
@@ -247,7 +247,7 @@ Minimal changes to index.ts:
 name: calendar
 version: 1.0.0
 description: "Query and manage the operator's calendar — look up events, check availability, and create new entries"
-metadata: {"amber": {"capabilities": ["read", "act"], "confirmation_required": false, "timeout_ms": 5000, "permissions": {"local_binaries": ["ical-query"], "telegram": false, "openclaw_action": false, "network": false}, "function_schema": {"name": "calendar_query", "description": "Look up calendar events, check availability, or create a new calendar entry. For lookups use action 'lookup'. For creating events use action 'create'.", "parameters": {"type": "object", "properties": {"action": {"type": "string", "enum": ["lookup", "create"], "description": "Whether to look up existing events or create a new one"}, "range": {"type": "string", "description": "For lookup: today, tomorrow, week, or a specific date like 2026-02-22"}, "title": {"type": "string", "description": "For create: the event title"}, "start": {"type": "string", "description": "For create: start date-time in ISO format"}, "end": {"type": "string", "description": "For create: end date-time in ISO format"}, "calendar": {"type": "string", "description": "Optional: specific calendar name"}, "notes": {"type": "string", "description": "For create: event notes"}, "location": {"type": "string", "description": "For create: event location"}}, "required": ["action"]}}}}
+metadata: {"amber": {"capabilities": ["read", "act"], "confirmation_required": true, "timeout_ms": 5000, "permissions": {"local_binaries": ["ical-query"], "telegram": false, "openclaw_action": false, "network": false}, "function_schema": {"name": "calendar_query", "description": "Look up calendar events, check availability, or create a new calendar entry. For lookups use action 'lookup'. For creating events use action 'create'.", "parameters": {"type": "object", "properties": {"action": {"type": "string", "enum": ["lookup", "create"], "description": "Whether to look up existing events or create a new one"}, "range": {"type": "string", "description": "For lookup: today, tomorrow, week, or a specific date like 2026-02-22"}, "title": {"type": "string", "description": "For create: the event title"}, "start": {"type": "string", "description": "For create: start date-time in ISO format"}, "end": {"type": "string", "description": "For create: end date-time in ISO format"}, "calendar": {"type": "string", "description": "Optional: specific calendar name"}, "notes": {"type": "string", "description": "For create: event notes"}, "location": {"type": "string", "description": "For create: event location"}, "confirmed": {"type": "boolean", "description": "Required for create after explicit caller confirmation"}}, "required": ["action"]}}}}
 ---
 
 # Calendar Skill
@@ -262,8 +262,7 @@ Query and manage the operator's calendar via `ical-query` CLI.
 - Uses the local `ical-query` binary (Apple Calendar / EventKit)
 - Calendar name is optional — defaults to the operator's primary calendar
 - No network access required — all local
-- No confirmation required — calendar lookups are read-safe, and event creation
-  is typically confirmed verbally during the conversation flow
+- Calendar lookup is read-safe; calendar creation is a side effect and requires `confirmed: true` after the caller explicitly confirms title, date, start/end time, and any location/notes.
 ```
 
 ### handler.js

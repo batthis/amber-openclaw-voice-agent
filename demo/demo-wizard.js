@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// Amber Voice Assistant — Setup Wizard Demo (validation disabled for demo purposes)
-// This is a demo version that shows the UX flow without calling real APIs
+// Amber Voice Assistant — Setup Wizard Demo (mock validation only)
+// This demo shows the UX flow without calling real APIs. It does not verify credentials.
 
 import { createInterface } from 'node:readline/promises';
 import { stdin, stdout } from 'node:process';
@@ -60,7 +60,7 @@ ${c.bold}${c.cyan}╔═══════════════════�
   cfg.TWILIO_AUTH_TOKEN = await ask('Auth Token');
   
   await spinner('Validating Twilio credentials…');
-  ok('Twilio credentials valid');
+  ok('Twilio credential format accepted for demo playback (not verified)');
 
   cfg.TWILIO_CALLER_ID = await ask('Twilio phone number (E.164, e.g. +15555551234)');
   ok('Phone number format valid');
@@ -71,7 +71,7 @@ ${c.bold}${c.cyan}╔═══════════════════�
 
   cfg.OPENAI_API_KEY = await ask('API Key (starts with sk-)');
   await spinner('Validating OpenAI API key…');
-  ok('OpenAI API key valid');
+  ok('OpenAI API key format accepted for demo playback (not verified)');
 
   cfg.OPENAI_PROJECT_ID = await ask('Project ID (starts with proj_)');
   ok('Project ID format valid');

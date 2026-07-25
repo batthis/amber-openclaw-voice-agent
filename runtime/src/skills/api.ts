@@ -5,9 +5,9 @@
  * enforced based on the skill's manifest.
  */
 
-import { execFileSync } from 'child_process';
 import { AmberSkillPermissions, SkillCallContext } from './types.js';
 import OpenAI from 'openai';
+import { runLocalHelper } from '../local-helper-runner.js';
 
 export interface ApiDependencies {
   /** OpenClaw gateway client (OpenAI-compatible) */
@@ -41,8 +41,9 @@ export function buildSkillContext(
      * Execute a local binary. Only binaries listed in permissions.local_binaries are allowed.
      *
      * cmd must be a string[] — e.g. ['/usr/local/bin/ical-query', 'today'].
-     * Uses execFileSync: no shell is spawned, arguments are passed as discrete tokens,
-     * immune to shell injection regardless of argument content.
+     * Uses the shared local-helper runner with shell disabled and the same
+     * allowlist enforced at the process-launch boundary. Arguments are passed
+     * as discrete tokens, avoiding shell interpolation regardless of content.
      */
     exec: async (cmd: string[]): Promise<string> => {
       if (!Array.isArray(cmd) || cmd.length === 0) {
@@ -57,7 +58,7 @@ export function buildSkillContext(
       }
 
       try {
-        return execFileSync(file, args, { encoding: 'utf8', timeout: 10000 }).trim();
+        return await runLocalHelper(file, args, { allowedBinaries: [...allowedBins] });
       } catch (e: any) {
         throw new Error(`exec failed: ${e.message || e}`);
       }

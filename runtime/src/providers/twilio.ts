@@ -17,8 +17,8 @@ import type { IVoiceProvider, OutboundCallParams, SipBridgeParams, CallResult } 
 export interface TwilioProviderConfig {
   /** Twilio Account SID (TWILIO_ACCOUNT_SID env var) */
   accountSid: string;
-  /** Twilio Auth Token (TWILIO_AUTH_TOKEN env var) */
-  authToken: string;
+  /** Twilio credential value (TWILIO_AUTH_TOKEN env var) */
+  credential: string;
   /**
    * OpenAI Project ID used to construct the SIP URI.
    * Format: sip:<projectId>@sip.api.openai.com
@@ -32,18 +32,18 @@ export class TwilioProvider implements IVoiceProvider {
   readonly responseContentType = 'text/xml';
   readonly webhookSignatureHeader = 'x-twilio-signature';
 
-  private readonly authToken: string;
+  private readonly twilioCredential: string;
   private readonly openAiProjectId: string;
   private readonly client: ReturnType<typeof twilio>;
 
   constructor(config: TwilioProviderConfig) {
     if (!config.accountSid) throw new Error('TwilioProvider: missing accountSid');
-    if (!config.authToken) throw new Error('TwilioProvider: missing authToken');
+    if (!config.credential) throw new Error('TwilioProvider: missing credential');
     if (!config.openAiProjectId) throw new Error('TwilioProvider: missing openAiProjectId');
 
-    this.authToken = config.authToken;
+    this.twilioCredential = config.credential;
     this.openAiProjectId = config.openAiProjectId;
-    this.client = twilio(config.accountSid, config.authToken);
+    this.client = twilio(config.accountSid, config.credential);
   }
 
   // ── Webhook validation ───────────────────────────────────────────────────

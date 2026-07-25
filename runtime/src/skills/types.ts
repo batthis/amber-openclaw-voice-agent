@@ -32,7 +32,7 @@ export interface AmberSkillManifest {
 }
 
 export interface SkillCallContext {
-  /** Must be string[] — uses execFileSync (no shell spawned, no injection risk). */
+  /** Must be string[] — runs with shell disabled (no shell interpolation). */
   exec: (cmd: string[]) => Promise<string>;
   callLog: {
     write: (entry: Record<string, any>) => void;

@@ -44,15 +44,15 @@ Note: The `--server-url` flag is required on this system even though authenticat
 
 ## What the Demo Shows
 
-The wizard guides users through:
+The demo wizard guides users through:
 
 1. **Twilio Configuration**
    - Account SID validation (must start with "AC")
-   - Real-time credential testing via Twilio API
+   - Mock credential-validation UX only in the demo recording (the real runtime wizard does live verification)
    - Phone number format validation (E.164)
 
 2. **OpenAI Configuration**
-   - API key validation via OpenAI API
+   - Mock API-key-validation UX only in the demo recording (the real runtime wizard does live verification)
    - Project ID and webhook secret (required for OpenAI Realtime)
    - Voice selection (alloy/echo/fable/onyx/nova/shimmer)
 
@@ -73,12 +73,14 @@ The wizard guides users through:
 
 ## Demo Flow
 
+> Important: `demo-wizard.js` is a playback/demo artifact. It does **not** call Twilio or OpenAI and must not be described as a real validator. The real interactive validator is `runtime/setup-wizard.js` via `npm run setup`.
+
 The demo uses these example values (not real credentials):
 - **Twilio SID:** AC1234567890abcdef1234567890abcd
 - **Phone:** +15551234567
-- **OpenAI Key:** <openai-api-key>
+- **OpenAI Key:** paste-your-openai-api-key
 - **OpenAI Project ID:** proj_demo1234567890abcdef
-- **OpenAI Webhook Secret:** <openai-webhook-secret>
+- **OpenAI Webhook Secret:** paste-your-openai-webhook-secret
 - **Assistant:** Amber
 - **Operator:** John Smith
 - **Organization:** Acme Corp

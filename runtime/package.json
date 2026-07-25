@@ -1,6 +1,6 @@
 {
   "name": "amber-voice-bridge",
-  "version": "5.5.0",
+  "version": "5.5.40",
   "description": "Twilio + OpenAI Realtime SIP bridge for Amber Voice Assistant (OpenClaw skill)",
   "private": true,
   "type": "module",
@@ -30,9 +30,10 @@
     "@types/node": "^22.10.2",
     "@types/ws": "^8.5.12",
     "tsx": "^4.19.2",
-    "typescript": "^5.7.3"
+    "typescript": "^5.9.3"
   },
   "engines": {
     "node": ">=20.0.0"
-  }
+  },
+  "license": "MIT-0"
 }

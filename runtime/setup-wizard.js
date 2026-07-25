@@ -5,7 +5,7 @@
 import { createInterface } from 'node:readline/promises';
 import { stdin, stdout, env } from 'node:process';
 import { existsSync, copyFileSync, writeFileSync, readFileSync } from 'node:fs';
-import { execSync, spawn } from 'node:child_process';
+import { access } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
@@ -65,7 +65,7 @@ async function validateTwilio(sid, token) {
       headers: { Authorization: 'Basic ' + Buffer.from(`${sid}:${token}`).toString('base64') },
     });
     s.stop();
-    if (res.ok) { ok('Twilio credentials valid'); return true; }
+    if (res.ok) { ok('Twilio credentials verified with Twilio over HTTPS'); return true; }
     fail(`Twilio auth failed (HTTP ${res.status})`);
     return false;
   } catch (e) {
@@ -82,7 +82,7 @@ async function validateOpenAI(key) {
       headers: { Authorization: `Bearer ${key}` },
     });
     s.stop();
-    if (res.ok) { ok('OpenAI API key valid'); return true; }
+    if (res.ok) { ok('OpenAI API key verified with OpenAI over HTTPS'); return true; }
     fail(`OpenAI auth failed (HTTP ${res.status})`);
     return false;
   } catch (e) {
@@ -92,9 +92,15 @@ async function validateOpenAI(key) {
   }
 }
 
-function detectNgrok() {
-  // Security: hardcoded command, no user input involved
-  try { execSync('which ngrok', { stdio: 'pipe' }); return true; } catch { return false; }
+async function detectNgrok() {
+  const pathDirs = (env.PATH || '').split(':').filter(Boolean);
+  for (const dir of pathDirs) {
+    try {
+      await access(resolve(dir, 'ngrok'));
+      return true;
+    } catch {}
+  }
+  return false;
 }
 
 async function getActiveNgrokTunnel() {
@@ -108,18 +114,70 @@ async function getActiveNgrokTunnel() {
 }
 
 async function startNgrok(port) {
-  info('Starting ngrok…');
-  // Security: 'ngrok' is a hardcoded binary name; port is coerced to string from a numeric config value
-  const proc = spawn('ngrok', ['http', String(port)], { stdio: 'ignore', detached: true });
-  proc.unref();
-  // wait up to 5s for tunnel
-  for (let i = 0; i < 10; i++) {
-    await new Promise(r => setTimeout(r, 500));
-    const url = await getActiveNgrokTunnel();
-    if (url) { ok(`ngrok tunnel: ${url}`); return url; }
-  }
-  warn('ngrok started but no tunnel detected yet — you may need to set PUBLIC_BASE_URL manually.');
+  info(`Open a second terminal and run: ngrok http ${String(port)}`);
+  info('Then paste the HTTPS forwarding URL below.');
   return null;
+}
+
+function shellQuote(value) {
+  return "'" + String(value).replace(/'/g, "'\\''") + "'";
+}
+
+function writeHermesInstallFiles(cfg) {
+  const repoRoot = resolve(__dirname, '..');
+  const runtimeDir = __dirname;
+  const hermesDir = resolve(repoRoot, 'packaging', 'hermes');
+  const skillSourcePath = resolve(hermesDir, 'SKILL.md');
+  const mcpSourcePath = resolve(hermesDir, 'mcp_servers.yaml');
+  const generatedPath = resolve(runtimeDir, 'hermes-install.md');
+  const mcpServerPath = resolve(runtimeDir, 'dist', 'mcp-server.js');
+  const bridgeUrl = `http://127.0.0.1:${cfg.PORT || '8000'}`;
+  const content = `# Amber for Hermes — Generated Install Notes
+
+Generated: ${new Date().toISOString()}
+
+## 1. Install the Hermes skill wrapper
+
+\`\`\`bash
+mkdir -p ~/.hermes/skills/amber-phone-agent
+cp ${shellQuote(skillSourcePath)} ~/.hermes/skills/amber-phone-agent/SKILL.md
+\`\`\`
+
+## 2. Add Amber MCP to Hermes config
+
+Add this block to your Hermes Agent config, then restart Hermes or run \`/reload-mcp\`:
+
+\`\`\`yaml
+mcp_servers:
+  amber_voice:
+    command: "node"
+    args:
+      - ${JSON.stringify(mcpServerPath)}
+    env:
+      AMBER_BRIDGE_URL: ${JSON.stringify(bridgeUrl)}
+      BRIDGE_API_TOKEN: ""
+\`\`\`
+
+## 3. Start Amber
+
+\`\`\`bash
+cd ${shellQuote(runtimeDir)}
+npm start
+\`\`\`
+
+## 4. Verify
+
+- \`curl ${bridgeUrl}/healthz\` should return \`{"ok":true}\`.
+- In Hermes, ask: \`Tell me which MCP-backed tools are available right now.\`
+- Use \`bridge_health\` before trying real calls.
+
+Static reference files:
+
+- ${skillSourcePath}
+- ${mcpSourcePath}
+`;
+  writeFileSync(generatedPath, content);
+  return { generatedPath, skillSourcePath, mcpSourcePath, bridgeUrl };
 }
 
 // ── Main ─────────────────────────────────────────────────────────────
@@ -132,6 +190,9 @@ ${c.bold}${c.cyan}╔═══════════════════�
 ╚══════════════════════════════════════════════╝${c.reset}
 `);
   info('This wizard will walk you through configuration and generate a .env file.');
+  warn('Amber is a sensitive communications system: calls may be handled by AI providers and logged locally.');
+  warn('Secrets and operator contact details entered here are written to runtime/.env; keep that file private and out of published packages.');
+  info('Credential validation calls only the relevant provider APIs over HTTPS (Twilio/OpenAI) and does not send secrets to Amber or ClawHub.');
   info('Press Enter to accept defaults shown in parentheses.\n');
 
   const cfg = {};
@@ -213,19 +274,19 @@ ${c.bold}${c.cyan}╔═══════════════════�
   cfg.PORT = await ask('Port', '8000');
 
   // ngrok detection
-  const ngrokInstalled = detectNgrok();
+  const ngrokInstalled = await detectNgrok();
   let publicUrl = null;
 
   if (ngrokInstalled) {
-    ok('ngrok detected');
+    ok('ngrok binary detected locally');
     const tunnel = await getActiveNgrokTunnel();
     if (tunnel) {
-      ok(`Active ngrok tunnel found: ${tunnel}`);
+      ok(`Active local ngrok tunnel detected: ${tunnel}`);
       if (await yesNo(`Use ${tunnel} as PUBLIC_BASE_URL?`)) publicUrl = tunnel;
     } else {
       info('No active ngrok tunnel found.');
-      if (await yesNo(`Start ngrok on port ${cfg.PORT}?`)) {
-        publicUrl = await startNgrok(cfg.PORT);
+      if (await yesNo(`Show ngrok command for port ${cfg.PORT}?`)) {
+        await startNgrok(cfg.PORT);
       }
     }
   } else {
@@ -238,13 +299,32 @@ ${c.bold}${c.cyan}╔═══════════════════�
     cfg.PUBLIC_BASE_URL = publicUrl;
   }
 
-  // ── Optional: OpenClaw ─────────────────────────────────────────────
-  head('OpenClaw Gateway (optional)');
-  info('If you have an OpenClaw gateway, the assistant can consult it during calls.');
+  head('Outbound Calls (optional)');
+  info('Outbound calling is enabled by default for the full Amber experience. You can disable it later.');
+  cfg.AMBER_ENABLE_OUTBOUND_CALLS = await yesNo('Enable outbound calling?', true) ? 'true' : 'false';
 
-  if (await yesNo('Configure OpenClaw integration?', false)) {
-    cfg.OPENCLAW_GATEWAY_URL = await ask('Gateway URL', 'http://127.0.0.1:18789');
-    cfg.OPENCLAW_GATEWAY_TOKEN = await ask('Gateway Token', '');
+  // ── Agent Platform Integration ───────────────────────────────────
+  head('Agent Platform Integration');
+  info("Amber's phone runtime is platform-agnostic. This only changes the agent-facing setup notes.");
+  info('Supported targets: openclaw, hermes, mcp, none');
+
+  while (true) {
+    cfg.AMBER_AGENT_PLATFORM = (await ask('Target agent platform', 'openclaw')).toLowerCase();
+    if (['openclaw', 'hermes', 'mcp', 'none'].includes(cfg.AMBER_AGENT_PLATFORM)) break;
+    fail('Choose one of: openclaw, hermes, mcp, none');
+  }
+
+  if (cfg.AMBER_AGENT_PLATFORM === 'openclaw') {
+    info('If you have an OpenClaw gateway, the assistant can consult it during calls.');
+    if (await yesNo('Configure OpenClaw integration?', false)) {
+      cfg.OPENCLAW_GATEWAY_URL = await ask('Gateway URL', 'http://127.0.0.1:18789');
+      cfg.OPENCLAW_GATEWAY_TOKEN = await ask('Gateway Token', '');
+    }
+  } else if (cfg.AMBER_AGENT_PLATFORM === 'hermes') {
+    info("Hermes integration uses Amber's MCP server plus a Hermes AgentSkill wrapper.");
+    info('The wizard will generate runtime/hermes-install.md with exact paths for this machine.');
+  } else if (cfg.AMBER_AGENT_PLATFORM === 'mcp') {
+    info('Generic MCP mode uses runtime/dist/mcp-server.js from any MCP-compatible client.');
   }
 
   // ── Optional: Personalization ──────────────────────────────────────
@@ -269,6 +349,7 @@ ${c.bold}${c.cyan}╔═══════════════════�
 
   // ── Generate .env ──────────────────────────────────────────────────
   head('Generating .env');
+  warn('Writing secrets, phone numbers, and optional operator identity fields to runtime/.env. Protect this file and rotate credentials if it is exposed.');
 
   if (existsSync(envPath)) {
     const ts = new Date().toISOString().replace(/[:.]/g, '-');
@@ -299,6 +380,13 @@ ${c.bold}${c.cyan}╔═══════════════════�
     '# === Server ===',
     `PORT=${cfg.PORT}`,
     `PUBLIC_BASE_URL=${cfg.PUBLIC_BASE_URL}`,
+    '',
+    '# === Agent Platform ===',
+    `AMBER_AGENT_PLATFORM=${cfg.AMBER_AGENT_PLATFORM || 'openclaw'}`,
+    '',
+    '# === Safety ===',
+    '# Outbound calling defaults to enabled. Set false to disable the outbound call endpoint.',
+    `AMBER_ENABLE_OUTBOUND_CALLS=${cfg.AMBER_ENABLE_OUTBOUND_CALLS}`,
   ];
 
   if (cfg.OPENCLAW_GATEWAY_URL) {
@@ -322,180 +410,36 @@ ${c.bold}${c.cyan}╔═══════════════════�
   writeFileSync(envPath, lines.join('\n'));
   ok(`.env written to ${envPath}`);
 
+  let hermesInstall = null;
+  if (cfg.AMBER_AGENT_PLATFORM === 'hermes') {
+    hermesInstall = writeHermesInstallFiles(cfg);
+    ok(`Hermes install notes written to ${hermesInstall.generatedPath}`);
+  }
+
   // ── Post-setup ─────────────────────────────────────────────────────
   head('Post-Setup');
+  info('Configuration is complete. To keep this wizard safe and transparent, it does not run install/build commands itself.');
+  info('Run these commands next from the runtime directory:');
+  info('  npm install');
+  info('  npm run build');
 
-  if (await yesNo('Run npm install?')) {
-    // Check for native build tools — better-sqlite3 (CRM skill) requires compilation.
-    // On macOS this means Xcode CLI tools + accepted license. Warn early so the user
-    // knows what to do if npm install fails with a gyp/make error.
-    const platform = process.platform;
-    if (platform === 'darwin') {
-      try {
-        execSync('xcode-select -p', { stdio: 'pipe' });
-        // Xcode tools present — check license accepted
-        try {
-          execSync('xcodebuild -license check', { stdio: 'pipe' });
-        } catch (_) {
-          warn('Xcode license not accepted. The CRM skill (better-sqlite3) requires native compilation.');
-          warn('If npm install fails, run: sudo xcodebuild -license accept');
-        }
-      } catch (_) {
-        warn('Xcode Command Line Tools not found. The CRM skill (better-sqlite3) requires native compilation.');
-        warn('Install them first: xcode-select --install');
-      }
-    } else if (platform === 'linux') {
-      try {
-        execSync('which make && which python3', { stdio: 'pipe' });
-      } catch (_) {
-        warn('build-essential or python3 may be missing. The CRM skill requires native compilation.');
-        warn('On Debian/Ubuntu: sudo apt install build-essential python3');
-      }
-    }
-
-    const s = spinner('Installing dependencies…');
-    try {
-      // Security: hardcoded npm command, cwd scoped to this script's own directory
-      execSync('npm install', { cwd: __dirname, stdio: 'pipe' });
-      s.stop(); ok('Dependencies installed');
-    } catch (e) {
-      s.stop(); fail(`npm install failed: ${e.message}`);
-      if (platform === 'darwin') {
-        info('If the error mentions gyp or make, run: sudo xcodebuild -license accept  then retry npm install.');
-      }
-    }
-  }
-
-  if (await yesNo('Run npm run build?')) {
-    const s = spinner('Building…');
-    try {
-      // Security: hardcoded npm command, cwd scoped to this script's own directory
-      execSync('npm run build', { cwd: __dirname, stdio: 'pipe' });
-      s.stop(); ok('Build succeeded');
-    } catch (e) {
-      s.stop(); fail(`Build failed: ${e.message}`);
-    }
-  }
-
-  // ── Native Tools (macOS only) ────────────────────────────────────
   if (process.platform === 'darwin') {
     head('Native Tools (macOS)');
-    info('Amber uses native macOS tools for Calendar and Contacts access.');
-    info('These need to be compiled from Swift source (one-time).');
-
-    // Check for Swift compiler
-    let hasSwift = false;
-    try {
-      execSync('which swiftc', { stdio: 'pipe' });
-      hasSwift = true;
-      ok('Swift compiler found');
-    } catch (_) {
-      warn('Swift compiler not found. Install Xcode Command Line Tools:');
-      info('  xcode-select --install');
-      info('You can re-run setup after installing to compile native tools.');
-    }
-
-    if (hasSwift) {
-      const srcDir = resolve(__dirname, 'src');
-      const toolsDir = resolve(__dirname, '..', 'tools');
-
-      // Ensure tools directory exists
-      const { mkdirSync } = await import('node:fs');
-      try { mkdirSync(toolsDir, { recursive: true }); } catch (_) {}
-
-      // ── ical-query ──
-      const icalSrc = resolve(srcDir, 'ical-query.swift');
-      const icalBin = resolve(toolsDir, 'ical-query');
-      if (existsSync(icalSrc)) {
-        if (existsSync(icalBin)) {
-          ok('ical-query already compiled');
-        } else if (await yesNo('Compile ical-query (Calendar access)?')) {
-          const s = spinner('Compiling ical-query…');
-          try {
-            execSync(`swiftc "${icalSrc}" -o "${icalBin}" -framework EventKit -O`, { stdio: 'pipe', timeout: 60000 });
-            s.stop(); ok('ical-query compiled');
-          } catch (e) {
-            s.stop(); fail(`ical-query compilation failed: ${e.message}`);
-          }
-        }
-      } else {
-        info('ical-query source not found — skipping (Calendar features may be limited)');
-      }
-
-      // ── Grant permissions ──
-      const compiledTools = [];
-      if (existsSync(icalBin)) compiledTools.push({ name: 'ical-query', bin: icalBin, what: 'Calendar' });
-
-      if (compiledTools.length > 0) {
-        head('macOS Permissions');
-        info('macOS requires you to grant Calendar and Contacts access.');
-        info('A system dialog will appear for each — click "Allow".\n');
-
-        for (const tool of compiledTools) {
-          if (await yesNo(`Grant ${tool.what} access now?`)) {
-            try {
-              // Run a harmless query to trigger the macOS permission prompt
-              const testCmd = tool.name === 'ical-query' ? 'today' : 'search test';
-              execSync(`"${tool.bin}" ${testCmd}`, { stdio: 'pipe', timeout: 30000 });
-              ok(`${tool.what} access granted`);
-            } catch (e) {
-              const errMsg = e.stderr?.toString() || e.message || '';
-              if (errMsg.includes('denied') || errMsg.includes('Denied')) {
-                warn(`${tool.what} access was denied. Grant it manually:`);
-                info(`  System Settings → Privacy & Security → ${tool.what} → enable ${tool.name}`);
-              } else {
-                // Non-permission error — the command may have run fine but returned non-zero
-                // (e.g., no calendar events today). Check if it was actually a permission issue.
-                ok(`${tool.what} permission prompt triggered — check if you saw a dialog`);
-              }
-            }
-          }
-        }
-      }
-    }
+    info('Amber can use native macOS helpers for Calendar and Contacts access.');
+    info('If you need Calendar support, compile the helper after setup:');
+    info('  mkdir -p ../tools');
+    info('  swiftc src/ical-query.swift -o ../tools/ical-query -framework EventKit -O');
+    info('Then trigger the macOS permission dialog with:');
+    info('  ../tools/ical-query today');
   }
 
-  // ── Claude Desktop / Cowork Setup ───────────────────────────────
   head('Claude Desktop / Cowork Plugin (optional)');
-  info('Amber can also run as an MCP plugin for Claude Desktop.');
-  const isCowork = await yesNo('Are you setting up for Claude Desktop / Cowork?', false);
-
-  // ── Contacts Sync (macOS + Cowork only) ─────────────────────────
-  if (process.platform === 'darwin' && isCowork) {
-    head('Apple Contacts Sync');
-    info('Amber can look up contacts from your Apple address book.');
-    info('This exports your contacts to a local JSON cache file.');
-    info('(The cache stays on your machine — nothing is uploaded.)\n');
-
-    if (await yesNo('Sync Apple Contacts now?')) {
-      const s = spinner('Exporting contacts…');
-      try {
-        const syncScript = resolve(__dirname, 'scripts', 'sync-contacts.js');
-        execSync(`node "${syncScript}"`, { cwd: __dirname, stdio: 'pipe', timeout: 30000 });
-        s.stop();
-        const cachePath = resolve(__dirname, 'contacts-cache.json');
-        if (existsSync(cachePath)) {
-          const cache = JSON.parse(readFileSync(cachePath, 'utf8'));
-          ok(`Exported ${cache.count} contacts to contacts-cache.json`);
-        } else {
-          ok('Contacts sync completed');
-        }
-        info('To refresh later: npm run sync-contacts');
-      } catch (e) {
-        s.stop();
-        const errMsg = e.stderr?.toString() || e.message || '';
-        if (errMsg.includes('denied') || errMsg.includes('EPERM')) {
-          fail('Contacts access denied.');
-          info('Grant Full Disk Access to Terminal:');
-          info('  System Settings → Privacy & Security → Full Disk Access → enable Terminal');
-          info('Then re-run: npm run sync-contacts');
-        } else {
-          fail(`Contacts sync failed: ${e.message}`);
-        }
-      }
-    } else {
-      info('Skipped. Run later: npm run sync-contacts');
-    }
+  let isCowork = false;
+  if (await yesNo('Are you setting up for Claude Desktop / Cowork?', false)) {
+    isCowork = true;
+    info('To sync Apple Contacts after setup, run:');
+    info('  npm run sync-contacts');
+    info('The cache stays local at runtime/contacts-cache.json.');
   }
 
   // ── Summary ────────────────────────────────────────────────────────
@@ -505,6 +449,12 @@ ${c.bold}${c.cyan}╔═══════════════════�
   const hasNativeTools = process.platform === 'darwin' &&
     existsSync(resolve(__dirname, '..', 'tools', 'ical-query'));
   const hasContactsCache = isCowork && existsSync(resolve(__dirname, 'contacts-cache.json'));
+  const hermesNotes = cfg.AMBER_AGENT_PLATFORM === 'hermes' && hermesInstall ? `
+  ${hasNativeTools || hasContactsCache ? '6' : '4'}. ${c.cyan}Hermes Agent integration:${c.reset}
+     Install notes generated at:
+     ${c.bold}${hermesInstall.generatedPath}${c.reset}
+     Copy the skill wrapper to ~/.hermes/skills/amber-phone-agent/ and add the MCP config snippet.
+` : '';
 
   console.log(`
 ${c.bold}Next steps:${c.reset}
@@ -528,7 +478,7 @@ ${hasNativeTools ? `
   ${hasNativeTools ? '5' : '4'}. ${c.cyan}Contacts:${c.reset}
      Apple Contacts synced to local cache.
      To refresh: ${c.bold}npm run sync-contacts${c.reset}
-` : ''}
+` : ''}${hermesNotes}
 ${c.dim}Config saved to: ${envPath}${c.reset}
 `);
 

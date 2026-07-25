@@ -60,7 +60,7 @@ TWILIO_AUTH_TOKEN=your_auth_token
 TWILIO_CALLER_ID=+15555551234
 
 # Required: OpenAI
-OPENAI_API_KEY=<openai-api-key>
+OPENAI_API_KEY=<your_openai_api_key>
 OPENAI_PROJECT_ID=proj_xxxxxxxxxxxxxx
 OPENAI_WEBHOOK_SECRET=whsec_xxxxxxxxxxxxxxxx
 OPENAI_VOICE=alloy

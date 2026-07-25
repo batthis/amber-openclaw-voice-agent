@@ -220,21 +220,21 @@ module.exports = async function calendarHandler(params, context) {
       }
 
       assertAllowedBinary(args);
-      const output = await context.exec(args);
+      await context.exec(args);
 
       context.callLog.write({
         type: 'skill.calendar.create',
-        title: safeTitle,
         start, end,
         calendar: calendar || 'default',
-        location: location || null,
-        notes: notes || null,
+        title_redacted: true,
+        has_location: Boolean(location),
+        has_notes: Boolean(notes),
       });
 
       return {
         success: true,
         message: `Done — I've added that to the calendar.`,
-        result: { created: true, output },
+        result: { created: true },
       };
     }
 

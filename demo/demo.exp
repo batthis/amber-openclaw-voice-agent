@@ -23,7 +23,7 @@ send "+15551234567\r"
 
 # OpenAI config
 expect "API Key"
-send "<openai-api-key>\r"
+send "paste-your-openai-api-key\r"
 
 # Wait for validation
 sleep 1
@@ -35,7 +35,7 @@ send "proj_demo1234567890abcdef\r"
 sleep 0.5
 
 expect "Webhook Secret"
-send "<openai-webhook-secret>\r"
+send "paste-your-openai-webhook-secret\r"
 
 # Wait for validation
 sleep 0.5

@@ -327,7 +327,7 @@ Add to Amber's system prompt / AGENT.md:
 ```markdown
 ## CRM — Contact Memory
 
-You have a CRM that remembers callers across calls. Use it naturally:
+You have a CRM for local, operator-reviewed caller records. Use it only for relevant follow-up under the operator's notice, consent, and retention policy:
 
 ### On every inbound call:
 1. **Immediately** call `crm` with `lookup_contact` using the caller's phone number
@@ -335,14 +335,14 @@ You have a CRM that remembers callers across calls. Use it naturally:
 3. If the caller is new: proceed normally, listen for their name
 
 ### During the call:
-- When someone shares their name, email, company, or any identifying info,
-  call `crm` with `upsert_contact` to save it. Do this silently — don't announce
-  "I'm saving your information" or ask permission to "add them to the system."
-- This should feel like a human assistant who simply *remembers* people.
+- When someone shares their name, email, company, or details needed for follow-up,
+  call `crm` with `upsert_contact` only for relevant, non-sensitive data allowed by the operator's notice/consent policy.
+- Do not save sensitive, intimate, health, family, financial, legal, or unnecessary personal details just because they were mentioned.
+- Do not volunteer internal storage mechanics unprompted, but be transparent if the caller asks whether details are retained.
 
 ### At the end of every call:
 - Call `crm` with `log_interaction` — summarize what the call was about and the outcome.
-- This happens silently after the call ends or as part of your wrap-up.
+- Logging can happen after the call ends or during wrap-up, but retention must follow the operator's notice/consent and deletion policy.
 
 ### What NOT to do:
 - ❌ Don't ask "Can I get your name and email for our records?"
@@ -542,7 +542,7 @@ metadata: {"amber": {"capabilities": ["read", "act"], "confirmation_required": f
 ```
 
 Key decisions in the frontmatter:
-- **`confirmation_required: false`** — CRM writes happen silently. Unlike send-message, there's no caller-facing action to confirm.
+- **Confirmation opt-out** — CRM lookups/logging remain low-latency runtime operations, but writes must be limited to relevant, non-sensitive follow-up data under the operator's notice/consent and retention policy.
 - **`timeout_ms: 3000`** — SQLite queries are sub-millisecond. 3s is generous.
 - **`permissions.network: false`** — Local DB only. External adapter sync would need this flipped to `true` in v2.
 - **Capabilities: `["read", "act"]`** — Lookups are reads, upserts/logs are acts.

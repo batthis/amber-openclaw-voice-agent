@@ -21,22 +21,25 @@ import {
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { execFileSync } from 'node:child_process';
+import { getMcpRuntimeConfig } from './config.js';
+import { runLocalHelper } from './local-helper-runner.js';
 
 // ─── Configuration ───
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const BRIDGE_URL = process.env.AMBER_BRIDGE_URL ?? 'http://127.0.0.1:8000';
-const BRIDGE_API_TOKEN = process.env.BRIDGE_API_TOKEN ?? '';
-const OPERATOR_NAME = process.env.OPERATOR_NAME ?? '';
-const LOGS_DIR = process.env.AMBER_LOGS_DIR ?? path.join(__dirname, '..', 'logs');
+const runtimeConfig = getMcpRuntimeConfig(__dirname);
+const BRIDGE_URL = runtimeConfig.bridgeUrl;
+const BRIDGE_CREDENTIAL = runtimeConfig.bridgeCredential;
+const OPERATOR_NAME = runtimeConfig.operatorName;
+const LOGS_DIR = runtimeConfig.logsDir;
+const OUTBOUND_CALLS_ENABLED = runtimeConfig.outboundCallsEnabled;
 
 // ─── Helpers ───
 
 async function bridgeRequest(endpoint: string, body: Record<string, any>): Promise<any> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (BRIDGE_API_TOKEN) {
-    headers['Authorization'] = `Bearer ${BRIDGE_API_TOKEN}`;
+  if (BRIDGE_CREDENTIAL) {
+    headers['Authorization'] = `Bearer ${BRIDGE_CREDENTIAL}`;
   }
 
   const res = await fetch(`${BRIDGE_URL}${endpoint}`, {
@@ -94,8 +97,7 @@ function buildMcpSkillContext() {
       if (!allowedBins.has(baseBin) && !allowedBins.has(file)) {
         throw new Error(`Permission denied: binary "${baseBin}" not allowed`);
       }
-      const { execFileSync } = await import('node:child_process');
-      return execFileSync(file, args, { encoding: 'utf8', timeout: 10000 }).trim();
+      return runLocalHelper(file, args);
     },
 
     callLog: {
@@ -400,6 +402,16 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case 'make_call': {
         let { to, name: toName, objective, confirmed } = args as { to?: string; name?: string; objective: string; confirmed?: boolean };
 
+        if (!OUTBOUND_CALLS_ENABLED) {
+          return {
+            content: [{
+              type: 'text',
+              text: 'Outbound calling is disabled because AMBER_ENABLE_OUTBOUND_CALLS=false is set. Remove it or set AMBER_ENABLE_OUTBOUND_CALLS=true, then restart Amber.',
+            }],
+            isError: true,
+          };
+        }
+
         // Resolve name → phone number via contacts cache
         if (!to && toName) {
           const cachePath = path.join(__dirname, '..', 'contacts-cache.json');
@@ -699,8 +711,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           } else {
             const digits = contactPhone!.replace(/\D/g, '').slice(-10);
             matches = contacts.filter((c: any) => {
-              const phoneDigits = (c.phone || '').replace(/\D/g, '').slice(-10);
-              return phoneDigits === digits;
+              const phones = Array.isArray(c.phones) ? c.phones : (c.phone ? [{ number: c.phone }] : []);
+              return phones.some((p: any) => String(p.number || '').replace(/\D/g, '').slice(-10) === digits);
             });
           }
 

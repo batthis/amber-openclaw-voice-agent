@@ -1,20 +1,22 @@
 ---
 name: amber-voice-assistant
 title: "Amber — Give Your Agent Real Phone Capabilities"
-description: "Give your OpenClaw agent real phone capabilities: inbound answering, outbound calls, booking, screening, CRM memory, and real-world phone task execution."
+description: "Give your OpenClaw agent real phone capabilities. Setup uses a short wizard; after setup, run calls and phone tasks with one natural-language prompt."
 homepage: https://github.com/batthis/amber-openclaw-voice-agent
-metadata: {"openclaw":{"emoji":"☎️","requires":{"env":["TWILIO_ACCOUNT_SID","TWILIO_AUTH_TOKEN","TWILIO_CALLER_ID","OPENAI_API_KEY","OPENAI_PROJECT_ID","OPENAI_WEBHOOK_SECRET","PUBLIC_BASE_URL"],"optionalEnv":["OPENCLAW_GATEWAY_URL","OPENCLAW_GATEWAY_TOKEN","BRIDGE_API_TOKEN","TWILIO_WEBHOOK_STRICT","VOICE_PROVIDER","VOICE_WEBHOOK_SECRET","ASSISTANT_NAME","OPERATOR_NAME","AMBER_CRM_DB_PATH","AGENT_MD_PATH","DEFAULT_CALENDAR"],"anyBins":["node","ical-query","bash"]},"primaryEnv":"OPENAI_API_KEY","install":[{"id":"runtime","kind":"node","cwd":"runtime","label":"Install Amber runtime (cd runtime && npm ci && npm run build)"}]}}
+metadata: {"openclaw":{"emoji":"☎️","requires":{"env":[],"optionalEnv":["AMBER_ENABLE_OUTBOUND_CALLS","AMBER_REALTIME_MODEL","OPENCLAW_GATEWAY_URL","TWILIO_WEBHOOK_STRICT","VOICE_PROVIDER","VOICE_WEBHOOK_SECRET","ASSISTANT_NAME","OPERATOR_NAME","AMBER_CRM_DB_PATH","AGENT_MD_PATH","DEFAULT_CALENDAR","AMBER_CONTACTS_EXTENDED"],"anyBins":["node","ical-query"]},"permissions":{"network":true,"env":true,"webhooks":true,"localFiles":["runtime/logs/","runtime/contacts-cache.json","~/.config/amber/crm.sqlite"],"localBinaries":["node","ical-query"],"mcpTools":["prepare_call","start_call","call_history","crm","contacts_lookup","calendar","screening_control","bridge_health"],"externalServices":["Twilio or compatible voice provider","OpenAI Realtime/API","optional OpenClaw Gateway"]},"install":[{"id":"runtime","kind":"node","cwd":"runtime","label":"Install Amber runtime (cd runtime && npm ci && npm run build)"}]}}
 ---
 
 # Amber — Give Your Agent Real Phone Capabilities
 
 ## Overview
 
-Amber gives any OpenClaw deployment **real phone capabilities for agents**. It ships with a **production-ready Twilio + OpenAI Realtime bridge** (`runtime/`) that lets your OpenClaw agent answer inbound calls, make outbound calls, book appointments, screen callers, and complete real-world phone tasks via natural voice conversation over a real telephone number.
+Amber gives any OpenClaw deployment **real phone capabilities for agents**. It ships with a **production-ready Twilio + OpenAI Realtime bridge** (`runtime/`) for confirmed phone workflows: inbound answering, call screening, prepared outbound workflows, and confirmed scheduling over a real telephone number.
 
-**✨ New in v5.4.0:** Amber now ships as a **Claude Desktop MCP plugin** with 9 tools — make outbound calls by name, check call history, query CRM contacts, manage calendar, and control call screening, all from Claude Desktop or Claude Cowork. Includes Apple Contacts integration and a call confirmation safeguard to prevent wrong-number dials.
+Amber is a sensitive communications system. It can process call audio/transcripts through configured voice and AI providers, store local call logs, maintain a local CRM, read/write the operator calendar, expose local MCP tools, and optionally use an Apple Contacts export for name-to-number resolution. Operators should configure caller notice/consent, retention/deletion practices, and least-privilege provider credentials before production use.
 
-**✨ Also:** Interactive setup wizard (`npm run setup`) validates credentials in real-time and generates a working `.env` file — no manual configuration needed!
+**✨ New in v5.4.0:** Amber now ships as an **MCP plugin** with 9 tools — prepare confirmed calls by name, check call history, query CRM contacts, manage calendar, and control call screening. It works with Claude Desktop/Cowork and other MCP-capable clients or agent harnesses once configured. Includes Apple Contacts integration and a code-enforced call confirmation safeguard to prevent wrong-number dials.
+
+**✨ Also:** Interactive setup wizard (`npm run setup`) validates credentials in real-time and generates a working `.env` file — no manual configuration needed. Once setup is complete, Amber is prompt-based: ask your OpenClaw agent to prepare confirmed calls, answer/screen callers, schedule confirmed appointments, or handle phone workflows in natural language.
 
 ## See it in action
 
@@ -28,11 +30,11 @@ Amber gives any OpenClaw deployment **real phone capabilities for agents**. It s
 
 - **Runtime bridge** (`runtime/`) — a complete Node.js server that connects Twilio phone calls to OpenAI Realtime with OpenClaw brain-in-the-loop
 - **Amber Skills** (`amber-skills/`) — modular mid-call capabilities (CRM, calendar, log & forward message) with a spec for building your own
-- **Built-in CRM** — local SQLite contact database; Amber greets callers by name and references personal context naturally on every call, with operator review/correction responsibility
-- **Call log dashboard** (`dashboard/`) — browse call history, transcripts, and captured messages; includes **manual Sync button** to pull new calls on demand
+- **Built-in CRM** — local SQLite contact database; Amber can greet callers by name and use operator-approved context naturally on calls, with operator review/correction responsibility
+- **Call log dashboard** (`dashboard/`) — browse call history, transcripts, captured messages, estimated costs, and one-touch localhost test calls with regular/mini Realtime model selection
 - **Setup & validation scripts** — preflight checks, env templates, quickstart runner
 - **Architecture docs & troubleshooting** — call flow diagrams, common failure runbooks
-- **Safety guardrails** — approval patterns for outbound calls, payment escalation, consent boundaries, and explicit confirmation for calendar writes
+- **Safety guardrails** — outbound calls require code-enforced confirmation; payment escalation, consent boundaries, and explicit confirmation for calendar writes are documented
 
 ## 🔌 Amber Skills — Extensible by Design
 
@@ -40,14 +42,14 @@ Amber ships with a growing library of **Amber Skills** — modular capabilities 
 
 ### 👤 CRM — Contact Memory *(v5.3.0)*
 
-Amber remembers every caller across calls and uses that memory to personalize every conversation.
+Amber can maintain operator-reviewed caller memory across calls, limited to relevant follow-up context under the operator's notice, consent, and retention policy.
 
 - **Runtime-managed** — lookup and logging happen automatically; Amber never has to "remember" to call CRM
-- **Personalized greeting** — known callers are greeted by name; personal context (pets, recent events, preferences) is referenced warmly on the first sentence
-- **Two-pass enrichment** — auto-log captures the call immediately; a post-call LLM extraction pass reads the full transcript to extract name, email, and `context_notes`
-- **Operator review expected** — review, correct, or delete CRM records periodically so bad transcript extraction or misleading caller input does not persist indefinitely
+- **Personalized greeting** — known callers can be greeted by name; optional notes are used only when relevant to the call objective
+- **Two-pass enrichment** — auto-log captures the call immediately; an optional post-call extraction pass proposes caller details and notes for the local CRM
+- **Operator review expected** — review, correct, or delete CRM records periodically so bad transcript extraction, misleading caller input, or overly sensitive details do not persist indefinitely
 - **Symmetric** — works identically for inbound and outbound calls
-- **Local SQLite** — stored at `~/.config/amber/crm.sqlite`; no cloud, no data leaves your machine
+- **Local SQLite CRM** — contact memory is stored at `~/.config/amber/crm.sqlite`; CRM records are not cloud-hosted. Live call audio/transcripts still pass through Twilio/OpenAI as part of the phone bridge. Tell callers when calls are handled by an AI assistant and may be logged/used for follow-up, according to your local consent requirements.
 - **Native dependency** — requires `better-sqlite3` (native build). macOS: `sudo xcodebuild -license accept` before `npm install`. Linux: `build-essential` + `python3`.
 
 ### 📅 Calendar
@@ -55,7 +57,7 @@ Amber remembers every caller across calls and uses that memory to personalize ev
 Query the operator's calendar for availability or schedule a new event — all during a live call.
 
 - **Availability lookups** — free/busy slots for today, tomorrow, this week, or any specific date
-- **Event creation** — book appointments directly into the operator's calendar from a phone conversation, but only after explicit caller confirmation
+- **Event creation** — create calendar events from a phone conversation only after the required details are collected and the caller explicitly confirms the slot
 - **Privacy by default** — callers are only told whether the operator is free or busy; event titles, names, and locations are never disclosed
 - Powered by `ical-query` — local-only, zero network latency
 
@@ -78,6 +80,8 @@ Amber's skill system is designed to grow. Each skill is a self-contained directo
 
 See [`amber-skills/`](amber-skills/) for examples and the full specification to get started.
 
+**Contacts privacy:** Apple Contacts sync is opt-in. By default it exports only names and phone numbers needed for call-by-name. Set `AMBER_CONTACTS_EXTENDED=true` only if you explicitly want extra local-only fields such as email, organization, relationships, addresses, and notes in `runtime/contacts-cache.json`.
+
 > **Note:** Each skill's `handler.js` is reviewed against its declared permissions. When building or installing third-party skills, review the handler source as you would any Node.js module.
 
 ### Call log dashboard
@@ -88,14 +92,16 @@ cd dashboard && node scripts/serve.js   # → http://localhost:8787
 
 - **⬇ Sync button** (green) — immediately pulls new calls from `runtime/logs/` and refreshes the dashboard. Use this right after a call ends rather than waiting for the background watcher.
 - **↻ Refresh button** (blue) — reloads existing data from disk without re-processing logs.
+- **One-touch test calls** — when opened through `node scripts/serve.js`, the dashboard can call a test number through the local Amber bridge and choose `gpt-realtime` or `gpt-realtime-mini` per call.
+- **Cost visibility** — estimates telephony and Realtime token cost from call duration and saved usage metadata; rates are editable in the dashboard.
 - Background watcher (`node scripts/watch.js`) auto-syncs every 30 seconds when running.
 
 ## Why Amber
 
 - **Ship a voice assistant in minutes** — `npm install`, configure `.env`, `npm start`
 - Full inbound screening: greeting, message-taking, appointment booking with calendar integration
-- Outbound calls with structured call plans (reservations, inquiries, follow-ups)
-- **`ask_openclaw` tool (least-privilege)** — voice agent consults your OpenClaw gateway only for call-critical needs (calendar checks, booking, required factual lookups), not for unrelated tasks
+- Outbound calls with structured call plans (reservations, inquiries, follow-ups), with confirmation gates and a runtime disable switch
+- **OpenClaw gateway lookup (least-privilege)** — voice agent consults your OpenClaw gateway only for call-critical needs (availability checks, confirmed scheduling, required factual lookups), not for unrelated tasks
 - VAD tuning + verbal fillers to keep conversations natural (no dead air during lookups)
 - Fully configurable: assistant name, operator info, org name, calendar, screening style — all via env vars
 - Operator safety guardrails for approvals/escalation/payment handling
@@ -166,6 +172,7 @@ These controls reduce blast radius if a host or config file is exposed.
 
 ## Safe defaults
 
+- Outbound calling is enabled by default for the full phone-agent experience. Set `AMBER_ENABLE_OUTBOUND_CALLS=false` to disable the outbound call endpoint.
 - Require explicit approval before outbound calls. **Note on confirmation enforcement:** For MCP-initiated outbound calls (`make_call`), confirmation is enforced at the MCP server layer in code (the tool returns a preview and requires `confirmed=true` on a second call before dialing) — this is not LLM-only instruction. The LLM instruction layer provides an additional reminder, but the code gate is the primary enforcement mechanism.
 - If payment/deposit is requested, stop and escalate to the human operator.
 - Keep greeting short and clear.
