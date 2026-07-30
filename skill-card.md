@@ -60,7 +60,7 @@ Mitigation: Configure caller notice and consent appropriate to the deployment, a
 
 ## Skill Version(s)
 
-5.5.48
+5.5.49
 
 ## Ethical Considerations
 
