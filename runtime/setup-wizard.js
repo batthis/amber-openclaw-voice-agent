@@ -303,6 +303,16 @@ ${c.bold}${c.cyan}╔═══════════════════�
   info('Outbound calling is enabled by default for the full Amber experience. You can disable it later.');
   cfg.AMBER_ENABLE_OUTBOUND_CALLS = await yesNo('Enable outbound calling?', true) ? 'true' : 'false';
 
+  // ── CRM / Caller Memory ───────────────────────────────────────────
+  head('CRM Caller Memory (optional)');
+  info('CRM lets Amber recognize known callers by phone number and keep local interaction history.');
+  warn('CRM stores caller/contact records locally. Enable it only with appropriate caller notice, consent, retention, and review practices.');
+  cfg.AMBER_CRM_ENABLED = await yesNo('Enable local CRM caller memory?', false) ? 'true' : 'false';
+  if (cfg.AMBER_CRM_ENABLED === 'true') {
+    warn('Transcript enrichment can write AI-extracted caller details into CRM after calls. Leave it off unless you really want that workflow.');
+    cfg.AMBER_CRM_TRANSCRIPT_ENRICHMENT = await yesNo('Enable post-call CRM transcript enrichment?', false) ? 'true' : 'false';
+  }
+
   // ── Agent Platform Integration ───────────────────────────────────
   head('Agent Platform Integration');
   info("Amber's phone runtime is platform-agnostic. This only changes the agent-facing setup notes.");
@@ -384,6 +394,11 @@ ${c.bold}${c.cyan}╔═══════════════════�
     '# === Safety ===',
     '# Outbound calling defaults to enabled. Set false to disable the outbound call endpoint.',
     `AMBER_ENABLE_OUTBOUND_CALLS=${cfg.AMBER_ENABLE_OUTBOUND_CALLS}`,
+    '',
+    '# === CRM / Caller Memory ===',
+    '# Local caller memory is opt-in. Enable only with caller notice/consent and retention controls.',
+    `AMBER_CRM_ENABLED=${cfg.AMBER_CRM_ENABLED}`,
+    `AMBER_CRM_TRANSCRIPT_ENRICHMENT=${cfg.AMBER_CRM_TRANSCRIPT_ENRICHMENT || 'false'}`,
   ];
 
   if (cfg.OPENCLAW_GATEWAY_URL) {
@@ -419,7 +434,14 @@ ${c.bold}${c.cyan}╔═══════════════════�
   info('Configuration is complete. To keep this wizard safe and transparent, it does not run install/build commands itself.');
   info('Run these commands next from the runtime directory:');
   info('  npm install');
+  if (cfg.AMBER_CRM_ENABLED === 'true') {
+    info('  cd ../amber-skills/crm && npm install   # required for CRM caller memory');
+    info('  cd ../../runtime');
+  }
   info('  npm run build');
+  if (cfg.AMBER_CRM_ENABLED !== 'true') {
+    info('CRM caller memory is off. To enable it later, set AMBER_CRM_ENABLED=true and install amber-skills/crm dependencies.');
+  }
 
   if (process.platform === 'darwin') {
     head('Native Tools (macOS)');

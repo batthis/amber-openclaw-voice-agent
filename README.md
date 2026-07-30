@@ -25,6 +25,13 @@ Amber is not just a standalone voice bot or virtual receptionist. It operates as
 
 ## 🆕 What's New
 
+### v5.5.46 — CRM Install Robustness (Jul 2026)
+
+- Added setup wizard prompts for opt-in CRM caller memory and separate transcript enrichment consent
+- Added ClawHub install metadata for optional CRM skill dependencies
+- Added validation for CRM native SQLite dependency when caller memory is enabled
+- Documented CRM dependency install/rebuild steps for fresh installs and Node upgrades
+
 ### v5.3.1 — Security Scope Hardening (Feb 2026)
 
 Addressed scanner feedback around instruction scope and credential handling:
@@ -43,8 +50,12 @@ See [CRM skill docs](#-crm--contact-memory) below for details.
 
 ## Quick Start
 
+The setup wizard asks whether to enable local CRM caller memory. It defaults to off; enable it only when you have caller notice/consent and retention practices in place.
+
 ```bash
 cd runtime && npm ci
+cd ../amber-skills/crm && npm ci  # optional, required for AMBER_CRM_ENABLED=true
+cd ../../runtime
 cp ../references/env.example .env  # fill in your values
 npm run build && npm start
 ```
@@ -103,6 +114,7 @@ Amber can maintain local caller memory across calls and use operator-approved co
 - **Backfill-ready** — point the post-call extractor at old transcripts to prime the CRM from day one
 
 > **Native dependency:** The CRM skill uses `better-sqlite3`, which requires native compilation. On macOS, run `sudo xcodebuild -license accept` before `npm install` if you haven't already accepted the Xcode license. On Linux, ensure `build-essential` and `python3` are installed.
+> If CRM lookup starts failing after a Node.js upgrade, rebuild the native module with `cd amber-skills/crm && npm rebuild better-sqlite3`, then restart the Amber runtime.
 >
 > **Credential validation scope:** The setup wizard validates credentials only against official provider endpoints (Twilio API and OpenAI API) over HTTPS. It does not send secrets to arbitrary third-party services and does not print full secrets in console output.
 

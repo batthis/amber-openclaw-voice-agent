@@ -3,7 +3,7 @@ name: amber-voice-assistant
 title: "Amber — Give Your Agent Real Phone Capabilities"
 description: "Real phone assistant runtime with Twilio/OpenAI Realtime calling, inbound screening, confirmed outbound calls, local call logs/transcripts, optional local CRM/contact memory, calendar booking, contacts lookup, MCP tools, and a loopback-only dashboard."
 homepage: https://github.com/batthis/amber-openclaw-voice-agent
-metadata: {"openclaw":{"emoji":"☎️","requires":{"env":[],"optionalEnv":["AMBER_ENABLE_OUTBOUND_CALLS","AMBER_REALTIME_MODEL","AMBER_CRM_ENABLED","AMBER_CRM_TRANSCRIPT_ENRICHMENT","OPENCLAW_GATEWAY_URL","TWILIO_WEBHOOK_STRICT","VOICE_PROVIDER","VOICE_WEBHOOK_SECRET","ASSISTANT_NAME","OPERATOR_NAME","AMBER_CRM_DB_PATH","AGENT_MD_PATH","DEFAULT_CALENDAR","AMBER_CONTACTS_EXTENDED"],"anyBins":["node","ical-query"]},"permissions":{"network":true,"env":true,"webhooks":true,"localFiles":["runtime/logs/","runtime/contacts-cache.json","~/.config/amber/crm.sqlite"],"localBinaries":["node","ical-query"],"mcpTools":["prepare_call","start_call","call_history","crm","contacts_lookup","calendar","screening_control","bridge_health"],"externalServices":["Twilio or compatible voice provider","OpenAI Realtime/API","optional OpenClaw Gateway"]},"install":[{"id":"runtime","kind":"node","cwd":"runtime","label":"Install Amber runtime (cd runtime && npm ci && npm run build)"}]}}
+metadata: {"openclaw":{"emoji":"☎️","requires":{"env":[],"optionalEnv":["AMBER_ENABLE_OUTBOUND_CALLS","AMBER_REALTIME_MODEL","AMBER_CRM_ENABLED","AMBER_CRM_TRANSCRIPT_ENRICHMENT","OPENCLAW_GATEWAY_URL","TWILIO_WEBHOOK_STRICT","VOICE_PROVIDER","VOICE_WEBHOOK_SECRET","ASSISTANT_NAME","OPERATOR_NAME","AMBER_CRM_DB_PATH","AGENT_MD_PATH","DEFAULT_CALENDAR","AMBER_CONTACTS_EXTENDED"],"anyBins":["node","ical-query"]},"permissions":{"network":true,"env":true,"webhooks":true,"localFiles":["runtime/logs/","runtime/contacts-cache.json","~/.config/amber/crm.sqlite"],"localBinaries":["node","ical-query"],"mcpTools":["prepare_call","start_call","call_history","crm","contacts_lookup","calendar","screening_control","bridge_health"],"externalServices":["Twilio or compatible voice provider","OpenAI Realtime/API","optional OpenClaw Gateway"]},"install":[{"id":"runtime","kind":"node","cwd":"runtime","label":"Install Amber runtime (cd runtime && npm ci && npm run build)"},{"id":"crm-skill","kind":"node","cwd":"amber-skills/crm","label":"Install optional CRM skill dependencies (cd amber-skills/crm && npm ci)"}]}}
 ---
 
 # Amber — Give Your Agent Real Phone Capabilities
@@ -130,6 +130,7 @@ The easiest way to get started:
 3. Follow the interactive prompts — the wizard will:
    - Validate your Twilio and OpenAI credentials in real-time
    - Auto-detect and configure ngrok if available
+   - Ask whether to enable opt-in local CRM caller memory
    - Generate a working `.env` file
    - Optionally install dependencies and build the project
 4. Configure your Twilio webhook (wizard shows you the exact URL)
@@ -144,11 +145,13 @@ The easiest way to get started:
 
 ### Option B: Manual setup
 
-1. `cd runtime && npm ci`
-2. Copy `../references/env.example` to `runtime/.env` and fill in your values.
-3. `npm run build && npm start`
-4. Point your Twilio voice webhook to `https://<your-domain>/twilio/inbound`
-5. Call your Twilio number — your voice assistant answers!
+1. From the Amber skill folder: `cd runtime && npm ci`
+2. `cd ../amber-skills/crm && npm ci` if you plan to enable CRM caller memory.
+3. `cd ../..` and copy `references/env.example` to `runtime/.env`, then fill in your values.
+4. Set `AMBER_CRM_ENABLED=true` only if you want local caller memory/known-caller greetings.
+5. `cd runtime && npm run build && npm start`
+6. Point your Twilio voice webhook to `https://<your-domain>/twilio/inbound`
+7. Call your Twilio number — your voice assistant answers!
 
 ### Option C: Validation-only (existing setup)
 
@@ -212,6 +215,7 @@ These controls reduce blast radius if a host or config file is exposed.
 - **"Missing env vars"** → re-check `.env` values and re-run `scripts/validate_voice_env.sh`.
 - **"Call connects but assistant is silent"** → verify TTS model setting and provider auth.
 - **"ask_openclaw timeout"** → verify gateway URL/token and increase timeout conservatively.
+- **"CRM lookup fails after a Node upgrade"** → run `cd amber-skills/crm && npm rebuild better-sqlite3`, then restart the Amber runtime.
 - **"Webhook unreachable"** → verify tunnel/domain and Twilio webhook target.
 
 ## Guardrails for public release
