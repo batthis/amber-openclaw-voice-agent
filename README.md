@@ -25,6 +25,10 @@ Amber is not just a standalone voice bot or virtual receptionist. It operates as
 
 ## 🆕 What's New
 
+### v5.5.48 — Skill Card Evidence (Jul 2026)
+
+- Bundled an explicit ClawHub skill card for release verification evidence
+
 ### v5.5.47 — CRM Off Means Off (Jul 2026)
 
 - Hide the CRM skill from the voice runtime and MCP tool list unless `AMBER_CRM_ENABLED=true`
