@@ -1172,7 +1172,12 @@ const callAccept = {
 
 // ─── Load Amber Skills at startup ───
 const SKILLS_DIR = path.resolve(new URL('.', import.meta.url).pathname, '../../amber-skills');
-const loadedSkills = loadSkills(SKILLS_DIR);
+const loadedSkills = loadSkills(SKILLS_DIR).filter((skill) => {
+  if (skill.manifest.name !== 'crm') return true;
+  if (CRM_ENABLED) return true;
+  console.log('[skills] Skipping crm: AMBER_CRM_ENABLED is not true');
+  return false;
+});
 registerSkills(loadedSkills);
 
 app.listen(PORT, () => {

@@ -74,5 +74,6 @@ export function getMcpRuntimeConfig(dirname: string) {
     operatorName: process.env.OPERATOR_NAME ?? '',
     logsDir: process.env.AMBER_LOGS_DIR ?? path.join(dirname, '..', 'logs'),
     outboundCallsEnabled: OUTBOUND_CALLS_ENABLED,
+    crmEnabled: CRM_ENABLED,
   };
 }

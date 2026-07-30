@@ -25,6 +25,11 @@ Amber is not just a standalone voice bot or virtual receptionist. It operates as
 
 ## 🆕 What's New
 
+### v5.5.47 — CRM Off Means Off (Jul 2026)
+
+- Hide the CRM skill from the voice runtime and MCP tool list unless `AMBER_CRM_ENABLED=true`
+- Return a clear disabled message if an MCP client tries to call CRM while caller memory is off
+
 ### v5.5.46 — CRM Install Robustness (Jul 2026)
 
 - Added setup wizard prompts for opt-in CRM caller memory and separate transcript enrichment consent
