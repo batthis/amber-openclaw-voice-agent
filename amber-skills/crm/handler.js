@@ -5,10 +5,24 @@
  * All functions are synchronous — fast, no latency for voice calls.
  */
 
-const Database = require('better-sqlite3');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+
+function loadDatabaseDriver() {
+  try {
+    return require('better-sqlite3');
+  } catch (localError) {
+    const runtimeDriverPath = path.resolve(__dirname, '..', '..', 'runtime', 'node_modules', 'better-sqlite3');
+    try {
+      return require(runtimeDriverPath);
+    } catch (_) {
+      throw localError;
+    }
+  }
+}
+
+const Database = loadDatabaseDriver();
 
 // ============================================================================
 // Database Initialization
