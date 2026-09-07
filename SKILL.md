@@ -1,7 +1,7 @@
 ---
 name: amber-voice-assistant
 title: "Amber — Give Your Agent Real Phone Capabilities"
-description: "Real phone assistant runtime with Twilio/OpenAI Realtime calling, inbound screening, confirmed outbound calls, local call logs/transcripts, optional local CRM/contact memory, calendar booking, contacts lookup, MCP tools, and a loopback-only dashboard."
+description: "Give your agent a phone number. Amber answers calls, places confirmed outbound calls, completes phone tasks, logs transcripts, and exposes MCP tools."
 homepage: https://github.com/batthis/amber-openclaw-voice-agent
 metadata: {"openclaw":{"emoji":"☎️","requires":{"env":[],"optionalEnv":["AMBER_ENABLE_OUTBOUND_CALLS","AMBER_REALTIME_MODEL","AMBER_REALTIME_VAD_THRESHOLD","AMBER_REALTIME_VAD_PREFIX_PADDING_MS","AMBER_REALTIME_VAD_SILENCE_DURATION_MS","AMBER_CRM_ENABLED","AMBER_CRM_TRANSCRIPT_ENRICHMENT","OPENCLAW_GATEWAY_URL","TWILIO_WEBHOOK_STRICT","VOICE_PROVIDER","VOICE_WEBHOOK_SECRET","ASSISTANT_NAME","OPERATOR_NAME","AMBER_CRM_DB_PATH","AGENT_MD_PATH","DEFAULT_CALENDAR","AMBER_CONTACTS_EXTENDED"],"anyBins":["node","ical-query"]},"permissions":{"network":true,"env":true,"webhooks":true,"localFiles":["runtime/logs/","runtime/contacts-cache.json","~/.config/amber/crm.sqlite"],"localBinaries":["node","ical-query"],"mcpTools":["prepare_call","start_call","call_history","crm","contacts_lookup","calendar","screening_control","bridge_health"],"externalServices":["Twilio or compatible voice provider","OpenAI Realtime/API","optional OpenClaw Gateway"]},"install":[{"id":"runtime","kind":"node","cwd":"runtime","label":"Install Amber runtime (cd runtime && npm ci && npm run build)"},{"id":"crm-skill","kind":"node","cwd":"amber-skills/crm","label":"Install optional CRM skill dependencies (cd amber-skills/crm && npm ci)"}]}}
 ---
@@ -10,13 +10,17 @@ metadata: {"openclaw":{"emoji":"☎️","requires":{"env":[],"optionalEnv":["AMB
 
 ## Overview
 
-Amber gives any OpenClaw deployment **real phone capabilities for agents**. It ships with a **production-ready Twilio + OpenAI Realtime bridge** (`runtime/`) for confirmed phone workflows: inbound answering, call screening, prepared outbound workflows, confirmed scheduling over a real telephone number, local call logs/transcripts, optional local CRM/contact memory, contacts lookup, MCP tools, and a loopback-only dashboard.
+Amber gives any OpenClaw deployment **a real phone number and the tools to complete calls**. It ships with a **production-ready Twilio + OpenAI Realtime bridge** (`runtime/`) for confirmed phone workflows: answer callers, screen calls, place approved outbound calls, look up contacts, schedule appointments, take messages, log transcripts, and hand call-critical decisions back to OpenClaw through MCP tools.
+
+Use it when you want an agent to do the plain-English phone job: call this business, ask this question, book the slot, leave the message, screen this caller, or show me what happened. Amber is built for operators who want the phone capability layer under their own Twilio or compatible voice account, with local logs, a local dashboard, and confirmation gates before outbound calls or calendar writes.
 
 Amber is a sensitive communications system. It can process call audio/transcripts through configured voice and AI providers, store local call logs, maintain a local CRM, read/write the operator calendar, expose local MCP tools, and optionally use an Apple Contacts export for name-to-number resolution. Operators should configure caller notice/consent, retention/deletion practices, and least-privilege provider credentials before production use.
 
 Privacy defaults: local CRM lookup/logging is disabled unless `AMBER_CRM_ENABLED=true`, and post-call transcript enrichment is disabled unless `AMBER_CRM_TRANSCRIPT_ENRICHMENT=true`. Enable those only after setting caller notice/consent and retention/deletion practices.
 
-**✨ New in v5.4.0:** Amber now ships as an **MCP plugin** with 9 tools — prepare confirmed calls by name, check call history, query CRM contacts, manage calendar, and control call screening. It works with Claude Desktop/Cowork and other MCP-capable clients or agent harnesses once configured. Includes Apple Contacts integration and a code-enforced call confirmation safeguard to prevent wrong-number dials.
+**✨ New in v5.5.50:** Sharper ClawHub positioning: Amber is now described first as the phone-number-and-call-completion layer for agents, with inbound answering, confirmed outbound calling, scheduling, transcripts, and MCP tools visible before the deeper architecture.
+
+**✨ v5.4.0:** Amber ships as an **MCP plugin** with 9 tools — prepare confirmed calls by name, check call history, query CRM contacts, manage calendar, and control call screening. It works with Claude Desktop/Cowork and other MCP-capable clients or agent harnesses once configured. Includes Apple Contacts integration and a code-enforced call confirmation safeguard to prevent wrong-number dials.
 
 **✨ Also:** Interactive setup wizard (`npm run setup`) validates credentials in real-time and generates a working `.env` file — no manual configuration needed. Once setup is complete, Amber is prompt-based: ask your OpenClaw agent to prepare confirmed calls, answer/screen callers, schedule confirmed appointments, or handle phone workflows in natural language.
 
@@ -30,7 +34,7 @@ Privacy defaults: local CRM lookup/logging is disabled unless `AMBER_CRM_ENABLED
 
 ### What's included
 
-- **Runtime bridge** (`runtime/`) — a complete Node.js server that connects Twilio phone calls to OpenAI Realtime with OpenClaw brain-in-the-loop
+- **Phone number + runtime bridge** (`runtime/`) — a complete Node.js server that connects a Twilio or compatible phone number to OpenAI Realtime with OpenClaw brain-in-the-loop
 - **Amber Skills** (`amber-skills/`) — modular mid-call capabilities (CRM, calendar, log & forward message) with a spec for building your own
 - **Built-in CRM** — local SQLite contact database; Amber can greet callers by name and use operator-approved context naturally on calls, with operator review/correction responsibility
 - **Call log dashboard** (`dashboard/`) — browse call history, transcripts, captured messages, estimated costs, and one-touch localhost test calls with regular/mini Realtime model selection
@@ -101,6 +105,7 @@ cd dashboard && node scripts/serve.js   # → http://localhost:8787
 ## Why Amber
 
 - **Ship a voice assistant in minutes** — `npm install`, configure `.env`, `npm start`
+- **Give an agent a real phone number** — callers can reach it, and it can place confirmed outbound calls for concrete phone tasks
 - Full inbound screening: greeting, message-taking, appointment booking with calendar integration
 - Outbound calls with structured call plans (reservations, inquiries, follow-ups), with confirmation gates and a runtime disable switch
 - **OpenClaw gateway lookup (least-privilege)** — voice agent consults your OpenClaw gateway only for call-critical needs (availability checks, confirmed scheduling, required factual lookups), not for unrelated tasks

@@ -35,6 +35,7 @@ export function buildSkillContext(
   deps: ApiDependencies
 ): SkillCallContext {
   const allowedBins = new Set(permissions.local_binaries || []);
+  const canContactOperator = permissions.telegram === true || permissions.openclaw_action === true;
 
   return {
     /**
@@ -148,11 +149,11 @@ export function buildSkillContext(
     },
 
     /**
-     * Operator info from env vars.
+     * Operator info is exposed only to skills allowed to contact the operator or gateway.
      */
     operator: {
-      name: deps.operatorName,
-      telegramId: deps.operatorTelegramId,
+      name: canContactOperator ? deps.operatorName : '',
+      telegramId: canContactOperator ? deps.operatorTelegramId : undefined,
     },
   };
 }

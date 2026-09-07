@@ -2,7 +2,7 @@
 
 ## Description
 
-Amber gives an agent real phone capabilities through a Twilio or compatible voice bridge, OpenAI Realtime calling, MCP tools, inbound screening, confirmed outbound calls, call logs, transcripts, optional CRM/contact memory, calendar booking, contacts lookup, and a loopback-only dashboard.
+Amber gives an agent a real phone number and the tools to complete phone tasks: answer callers, screen calls, place confirmed outbound calls, look up contacts, book appointments, take messages, log transcripts, and expose MCP tools through a Twilio or compatible voice bridge.
 
 This skill is ready for commercial/non-commercial use.
 
@@ -16,7 +16,7 @@ MIT-0
 
 ## Use Case
 
-Developers and operators use Amber to connect an agent to real telephone workflows, including inbound screening, explicitly confirmed outbound calls, call-history review, contact lookup, CRM caller memory, and calendar-assisted scheduling. The skill is intended for configured deployments where the operator manages telephony, AI-provider credentials, caller notice, access control, and retention practices.
+Developers and operators use Amber when they want an agent to handle concrete phone work: call this business, ask this question, book the slot, leave the message, screen this caller, or show what happened after the call. Amber connects those workflows to a real phone number with inbound screening, explicitly confirmed outbound calls, call-history review, contact lookup, CRM caller memory, and calendar-assisted scheduling. The skill is intended for configured deployments where the operator manages telephony, AI-provider credentials, caller notice, access control, and retention practices.
 
 ## Deployment Geography for Use
 
@@ -41,7 +41,7 @@ Mitigation: Configure caller notice and consent appropriate to the deployment, a
 
 ## References
 
-- [ClawHub skill page](https://clawhub.ai/batthis/skills/amber-phone-agent)
+- [ClawHub skill page](https://clawhub.ai/batthis/amber-phone-agent)
 - [Amber repository](https://github.com/batthis/amber-openclaw-voice-agent)
 - [Architecture](references/architecture.md)
 - [Release checklist](references/release-checklist.md)
@@ -60,7 +60,7 @@ Mitigation: Configure caller notice and consent appropriate to the deployment, a
 
 ## Skill Version(s)
 
-5.5.49
+5.5.50
 
 ## Ethical Considerations
 

@@ -33,7 +33,7 @@
 
     .stats-grid {
       display: grid;
-      grid-template-columns: repeat(8, 1fr);
+      grid-template-columns: repeat(10, 1fr);
       gap: 0.75rem;
       margin-bottom: 1.5rem;
     }
@@ -239,7 +239,82 @@
     }
 
     .cost-pill { border-color: rgba(0, 200, 83, 0.28); color: #8ff0b2; }
+    .quality-pill.good { border-color: rgba(0, 200, 83, 0.35); color: #8ff0b2; }
+    .quality-pill.warn { border-color: rgba(255, 184, 107, 0.4); color: #ffcf9a; }
+    .quality-pill.bad { border-color: rgba(255, 85, 85, 0.4); color: #ff9999; }
     .warn-text { color: #ffb86b; font-size: 0.85rem; margin-top: 0.55rem; min-height: 1.2rem; }
+
+    .quality-panel {
+      margin-top: 0.8rem;
+      padding: 0.85rem;
+      background: rgba(255,255,255,0.025);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 10px;
+    }
+
+    .quality-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 0.5rem;
+      margin-top: 0.65rem;
+    }
+
+    .quality-metric {
+      min-height: 3.4rem;
+      padding: 0.55rem;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.035);
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .quality-metric .metric-label {
+      color: #888;
+      font-size: 0.65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 0.25rem;
+    }
+
+    .quality-metric .metric-value {
+      color: #fff;
+      font-weight: 800;
+      font-size: 1rem;
+      overflow-wrap: anywhere;
+    }
+
+    .waterfall {
+      display: grid;
+      gap: 0.45rem;
+      margin-top: 0.75rem;
+    }
+
+    .waterfall-row {
+      display: grid;
+      grid-template-columns: minmax(110px, 0.7fr) minmax(120px, 1.3fr) 64px;
+      gap: 0.6rem;
+      align-items: center;
+      color: #aaa;
+      font-size: 0.82rem;
+    }
+
+    .waterfall-track {
+      position: relative;
+      height: 8px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.06);
+      overflow: hidden;
+    }
+
+    .waterfall-bar {
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      min-width: 3px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #00d4ff, #ff2d92);
+    }
 
     .timeline { position: relative; padding-left: 2rem; }
     .timeline::before {
@@ -450,10 +525,13 @@
       .stats-grid { grid-template-columns: repeat(4, 1fr); }
       .controls { grid-template-columns: 1fr; }
       .action-panel { grid-template-columns: 1fr; }
+      .quality-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .waterfall-row { grid-template-columns: 1fr; gap: 0.3rem; }
     }
 
     @media (max-width: 600px) {
       .stats-grid { grid-template-columns: repeat(3, 1fr); }
+      .quality-grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -500,6 +578,16 @@
         <div class="stat-icon">📋</div>
         <div class="stat-value" id="stat-messages">-</div>
         <div class="stat-label">MESSAGES</div>
+      </div>
+      <div class="stat-card" data-filter="all">
+        <div class="stat-icon">📈</div>
+        <div class="stat-value" id="stat-quality">-</div>
+        <div class="stat-label">Quality</div>
+      </div>
+      <div class="stat-card" data-filter="all">
+        <div class="stat-icon">⏱️</div>
+        <div class="stat-value" id="stat-tool-p95">-</div>
+        <div class="stat-label">Tool P95</div>
       </div>
       <div class="stat-card" data-filter="all">
         <div class="stat-icon">💵</div>
@@ -687,11 +775,15 @@
 
     function saveSettings() {
       readSettingsFromForm();
-      const { bridgeToken, ...persistedSettings } = settings;
-      localStorage.setItem('calllog-settings', JSON.stringify(persistedSettings));
+      persistSettings();
       updateStats();
       applyFilters();
       showCallStatus('Settings saved. Bridge token stays in memory only.', '#8ff0b2');
+    }
+
+    function persistSettings() {
+      const { bridgeToken, ...persistedSettings } = settings;
+      localStorage.setItem('calllog-settings', JSON.stringify(persistedSettings));
     }
 
     function showCallStatus(msg, color = '#ffb86b') {
@@ -750,6 +842,21 @@
       return `${minutes}:${String(seconds).padStart(2, '0')}`;
     }
 
+    function formatMs(ms) {
+      const n = Number(ms);
+      if (!Number.isFinite(n) || n < 0) return '-';
+      if (n < 1000) return `${Math.round(n)} ms`;
+      return `${(n / 1000).toFixed(n < 10000 ? 1 : 0)} s`;
+    }
+
+    function qualityClass(score) {
+      const n = Number(score);
+      if (!Number.isFinite(n)) return 'warn';
+      if (n >= 85) return 'good';
+      if (n >= 70) return 'warn';
+      return 'bad';
+    }
+
     function getUsage(call) {
       return call?.usage && typeof call.usage === 'object' ? call.usage : {};
     }
@@ -775,6 +882,19 @@
       return `${settings.currency} ${n.toFixed(precision)}`;
     }
 
+    function average(values) {
+      const nums = values.map(Number).filter(Number.isFinite);
+      if (!nums.length) return null;
+      return nums.reduce((sum, n) => sum + n, 0) / nums.length;
+    }
+
+    function percentile(values, p) {
+      const nums = values.map(Number).filter(Number.isFinite).sort((a, b) => a - b);
+      if (!nums.length) return null;
+      const idx = Math.min(nums.length - 1, Math.max(0, Math.ceil(nums.length * p) - 1));
+      return nums[idx];
+    }
+
     function hasCaptured(call) {
       return !!(call.hasCapturedMessage || (Array.isArray(call.capturedMessages) && call.capturedMessages.length));
     }
@@ -789,6 +909,62 @@
       if (n && p) return `${escapeHtml(n)} <span class="pill">${escapeHtml(p)}</span>`;
       if (p) return `<span class="pill">${escapeHtml(p)}</span>`;
       return '<span class="pill">Unknown</span>';
+    }
+
+    function renderQuality(call) {
+      const q = call?.quality || {};
+      const hasQuality = q && (
+        Number.isFinite(Number(q.score)) ||
+        q.firstAudioMs !== null ||
+        q.firstResponseMs !== null ||
+        q.toolCallCount ||
+        q.interruptionCount ||
+        q.errorCount
+      );
+      if (!hasQuality) return '';
+
+      const toolCalls = Array.isArray(q.toolCalls) ? q.toolCalls : [];
+      const maxTool = Math.max(1, ...toolCalls.map(t => Number(t.durationMs || 0)).filter(Number.isFinite));
+      const waterfall = toolCalls.length ? `
+        <div class="waterfall">
+          ${toolCalls.map(t => {
+            const durationMs = Number(t.durationMs || 0);
+            const width = Math.max(3, Math.round((durationMs / maxTool) * 100));
+            const label = `${t.name || t.kind || 'tool'}${t.success === false ? ' failed' : ''}`;
+            return `
+              <div class="waterfall-row">
+                <div>${escapeHtml(label)}</div>
+                <div class="waterfall-track"><div class="waterfall-bar" style="width:${width}%"></div></div>
+                <div>${escapeHtml(formatMs(durationMs))}</div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      ` : '';
+
+      const score = Number(q.score);
+      const scoreText = Number.isFinite(score) ? `${Math.round(score)}/100` : '-';
+      const cls = qualityClass(score);
+      return `
+        <div class="quality-panel">
+          <div class="entry-meta">
+            <span class="pill quality-pill ${cls}">Quality ${escapeHtml(scoreText)}</span>
+            <span class="pill">${escapeHtml(Number(q.toolCallCount || 0))} tool call${Number(q.toolCallCount || 0) === 1 ? '' : 's'}</span>
+            ${q.failedToolCount ? `<span class="pill quality-pill bad">${escapeHtml(q.failedToolCount)} failed</span>` : ''}
+          </div>
+          <div class="quality-grid">
+            <div class="quality-metric"><div class="metric-label">First audio</div><div class="metric-value">${escapeHtml(formatMs(q.firstAudioMs))}</div></div>
+            <div class="quality-metric"><div class="metric-label">First response</div><div class="metric-value">${escapeHtml(formatMs(q.firstResponseMs))}</div></div>
+            <div class="quality-metric"><div class="metric-label">Tool avg</div><div class="metric-value">${escapeHtml(formatMs(q.toolAvgMs))}</div></div>
+            <div class="quality-metric"><div class="metric-label">Tool P95</div><div class="metric-value">${escapeHtml(formatMs(q.toolP95Ms))}</div></div>
+            <div class="quality-metric"><div class="metric-label">Latency fillers</div><div class="metric-value">${escapeHtml(Number(q.fillerCount || 0) + Number(q.latencyFollowupCount || 0))}</div></div>
+            <div class="quality-metric"><div class="metric-label">Dead-air risk</div><div class="metric-value">${escapeHtml(formatMs(q.deadAirRiskMs))}</div></div>
+            <div class="quality-metric"><div class="metric-label">Interruptions</div><div class="metric-value">${escapeHtml(Number(q.interruptionCount || 0))}</div></div>
+            <div class="quality-metric"><div class="metric-label">Errors</div><div class="metric-value">${escapeHtml(Number(q.errorCount || 0))}</div></div>
+          </div>
+          ${waterfall}
+        </div>
+      `;
     }
 
     function renderCall(call) {
@@ -809,6 +985,7 @@
           ${cost ? `<span class="pill cost-pill">${escapeHtml(formatMoney(cost.total))}</span>` : ''}
         </div>
       ` : '';
+      const qualityHTML = renderQuality(call);
 
       const captured = Array.isArray(call.capturedMessages) ? call.capturedMessages : [];
       const capturedHTML = captured.length ? `
@@ -874,6 +1051,7 @@
             ${sidLine}
           </div>
           ${metricsHTML}
+          ${qualityHTML}
           ${summaryHTML}
           ${capturedHTML}
           ${transcriptHTML}
@@ -939,6 +1117,11 @@
       const missing = total - transcripts;
       const followupCount = allCalls.filter(c => followups.has(c.id)).length;
       const totalCost = allCalls.reduce((sum, c) => sum + (estimateCost(c)?.total || 0), 0);
+      const avgQuality = average(allCalls.map(c => c?.quality?.score));
+      const toolDurations = allCalls.flatMap(c =>
+        Array.isArray(c?.quality?.toolCalls) ? c.quality.toolCalls.map(t => t.durationMs) : []
+      );
+      const toolP95 = percentile(toolDurations, 0.95);
 
       document.getElementById('stat-total').textContent = total;
       document.getElementById('stat-inbound').textContent = inbound;
@@ -947,6 +1130,8 @@
       document.getElementById('stat-transcripts').textContent = transcripts;
       document.getElementById('stat-missing').textContent = missing;
       document.getElementById('stat-followup').textContent = followupCount;
+      document.getElementById('stat-quality').textContent = avgQuality === null ? '-' : Math.round(avgQuality);
+      document.getElementById('stat-tool-p95').textContent = formatMs(toolP95);
       document.getElementById('stat-cost').textContent = totalCost ? formatMoney(totalCost).replace(settings.currency + ' ', '') : '-';
     }
 
@@ -980,7 +1165,7 @@
         });
         const result = await parseJsonResponse(resp, apiUrl('/api/call'));
         if (!resp.ok || !result.success) throw new Error(result.error || 'Call failed');
-        localStorage.setItem('calllog-settings', JSON.stringify(settings));
+        persistSettings();
         showCallStatus(`Call started: ${result.sid || 'bridge accepted request'}`, '#8ff0b2');
       } catch (err) {
         showCallStatus(`Call failed: ${err.message}`, '#ff7777');

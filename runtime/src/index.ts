@@ -877,7 +877,7 @@ const callAccept = {
               `[CRM] You are calling ${crmContact.name}. The person on the line IS ${crmContact.name}.`,
               contextLine,
               `Your objective for this call is: ${outboundObjective}`,
-              `Be yourself — warm, playful, a little flirty. Greet them by name like you're happy to hear them. If you have personal context, weave it in naturally (one quick line) — then pivot with something like "but the real reason I'm calling..." and pursue the objective. Stay on task but keep your personality. Don't become a robot just because you have a mission.`,
+              `Be yourself — warm, playful, and personable. Greet them by name like you're happy to hear them. If you have personal context, weave it in naturally (one quick line) — then pivot with something like "but the real reason I'm calling..." and pursue the objective. Stay on task but keep your personality. Don't become a robot just because you have a mission.`,
             ].filter(Boolean).join(' ');
           } else {
             // Inbound: personalized greeting with context is appropriate.
@@ -1038,13 +1038,20 @@ const callAccept = {
         const fnName = parsed?.name ?? pendingFunctionCalls.get(itemId)?.name ?? '';
         const fnArgs = parsed?.arguments ?? pendingFunctionCalls.get(itemId)?.args ?? '{}';
         pendingFunctionCalls.delete(itemId);
+        let fnArgKeys: string[] = [];
+        try {
+          const parsedArgs = JSON.parse(fnArgs);
+          if (parsedArgs && typeof parsedArgs === 'object' && !Array.isArray(parsedArgs)) {
+            fnArgKeys = Object.keys(parsedArgs).sort();
+          }
+        } catch {}
 
         writeJsonl({
           type: 'c2.function_call_detected',
           call_id: callId,
           received_at: new Date().toISOString(),
           fn_name: fnName,
-          fn_args: fnArgs,
+          arg_keys: fnArgKeys,
           item_id: itemId,
         });
 
@@ -1063,6 +1070,19 @@ const callAccept = {
 
           handleGatewayLookup(ws, callId, itemId, fnCallId, fnArgs, outboundObjective, outboundCallPlan, transcriptStream, writeJsonl);
         } else if (isSkillFunction(fnName)) {
+          const fillerInstruction = getSkillFiller(fnName, fnArgs);
+          ws.send(JSON.stringify({
+            type: 'response.create',
+            response: { instructions: fillerInstruction },
+          }));
+          writeJsonl({
+            type: 'c2.skill_filler_sent',
+            call_id: callId,
+            received_at: new Date().toISOString(),
+            fn_name: fnName,
+            filler: fillerInstruction,
+          });
+
           // Route to Amber Skills system
           const skillDeps: HandleSkillCallDeps = {
             clawdClient,
@@ -1075,7 +1095,46 @@ const callAccept = {
             sendFunctionCallOutput: (wsRef: any, fCallId: string, output: string) =>
               sendFunctionCallOutput(wsRef, fCallId, output),
           };
-          handleSkillCall(fnName, fnArgs, ws, fnCallId, skillDeps);
+          const skillTimers = [
+            setTimeout(() => {
+              try {
+                ws.send(JSON.stringify({
+                  type: 'response.create',
+                  response: {
+                    instructions: "Say briefly and naturally: I'm still working on that, but I've got you.",
+                  },
+                }));
+                writeJsonl({
+                  type: 'c2.skill_latency_followup',
+                  call_id: callId,
+                  received_at: new Date().toISOString(),
+                  fn_name: fnName,
+                  delay_ms: 8000,
+                });
+              } catch {}
+            }, 8000),
+            setTimeout(() => {
+              try {
+                ws.send(JSON.stringify({
+                  type: 'response.create',
+                  response: {
+                    instructions: "Say briefly and naturally: this is taking a little longer than usual, so keep the caller reassured without asking a new question.",
+                  },
+                }));
+                writeJsonl({
+                  type: 'c2.skill_latency_followup',
+                  call_id: callId,
+                  received_at: new Date().toISOString(),
+                  fn_name: fnName,
+                  delay_ms: 18000,
+                });
+              } catch {}
+            }, 18000),
+          ];
+          handleSkillCall(fnName, fnArgs, ws, fnCallId, skillDeps)
+            .finally(() => {
+              for (const timer of skillTimers) clearTimeout(timer);
+            });
         } else {
           // Unknown function — return a generic error
           sendFunctionCallOutput(ws, fnCallId, JSON.stringify({ error: `Unknown function: ${fnName}` }));
@@ -1517,6 +1576,26 @@ function getWittyFiller(fnArgs: string): string {
   return genericFillers[Math.floor(Math.random() * genericFillers.length)];
 }
 
+function getSkillFiller(fnName: string, fnArgs: string): string {
+  let action = '';
+  try {
+    const parsed = JSON.parse(fnArgs);
+    action = String(parsed?.action ?? '').toLowerCase();
+  } catch {}
+
+  const name = fnName.toLowerCase();
+  if (name.includes('calendar') || action.match(/availability|schedule|book|event|calendar/)) {
+    return "Say briefly and naturally: I'm checking the calendar now, so give me just a moment.";
+  }
+  if (name.includes('crm') || action.match(/lookup|contact|profile|note/)) {
+    return "Say briefly and naturally: I'm checking the contact notes now, so there may be a short pause.";
+  }
+  if (name.includes('message') || action.match(/message|forward|send|log/)) {
+    return "Say briefly and naturally: I'm getting that message saved now, just a second.";
+  }
+  return "Say briefly and naturally: I'm working on that now, just a moment.";
+}
+
 function buildSilenceFollowup(args: { mode: 'inbound' | 'outbound' }): string {
   const key = args.mode === 'inbound' ? 'Silence Followup: Inbound' : 'Silence Followup: Outbound';
   const fromMd = getAgentSection(key);
@@ -1571,31 +1650,36 @@ async function handleGatewayLookup(
     } catch {}
   }
 
-  try {
-    // Send ONE follow-up if the request takes >10 seconds, that's it
-    let followupSent = false;
-    const smallTalkTimer = setTimeout(() => {
-      if (!followupSent) {
-        followupSent = true;
+  const latencyFollowupTimers = [8000, 18000, 30000].map((delayMs) =>
+    setTimeout(() => {
+      try {
         const msg = {
           type: 'response.create',
           response: {
-            instructions: "Say naturally: Just pulling that up for you — how's everything else going?"
+            instructions: delayMs >= 30000
+              ? "Say naturally and briefly: this is taking longer than usual, but you're still checking and will keep the caller posted."
+              : "Say naturally and briefly: you're still checking, and keep the caller reassured without asking a new question."
           }
         };
         ws.send(JSON.stringify(msg));
-        log({ type: 'c2.smalltalk_followup', call_id: callId, received_at: new Date().toISOString() });
-      }
-    }, 10000); // After 10 seconds
+        log({
+          type: 'c2.ask_openclaw.latency_followup',
+          call_id: callId,
+          received_at: new Date().toISOString(),
+          delay_ms: delayMs,
+        });
+      } catch {}
+    }, delayMs)
+  );
 
+  try {
     const answer = await askOpenClaw(question, {
       callPlan,
       objective,
       transcript,
     });
 
-    // Stop small talk timer once we have the answer
-    clearTimeout(smallTalkTimer);
+    for (const timer of latencyFollowupTimers) clearTimeout(timer);
 
     log({
       type: 'c2.ask_openclaw.done',
@@ -1607,6 +1691,8 @@ async function handleGatewayLookup(
 
     sendFunctionCallOutput(ws, fnCallId, JSON.stringify({ answer }));
   } catch (e: any) {
+    for (const timer of latencyFollowupTimers) clearTimeout(timer);
+
     log({
       type: 'c2.ask_openclaw.error',
       call_id: callId,

@@ -1,15 +1,15 @@
 # ☎️ Amber — Give Your Agent Real Phone Capabilities
 
-**A phone capability layer for [OpenClaw](https://openclaw.ai)** — gives your OpenClaw agent inbound answering, screening, confirmed scheduling, optional outbound calling, local call logs/transcripts, optional local CRM/contact memory, contacts lookup, MCP tools, and a loopback-only dashboard via a provider-swappable telephony bridge + OpenAI Realtime. Twilio is the default and recommended provider. Claude Desktop/Cowork and other MCP-capable clients or agent harnesses can use the same phone, CRM, calendar, and call-history capabilities once configured.
+**A phone number and call-completion layer for [OpenClaw](https://openclaw.ai)** — gives your OpenClaw agent a real phone endpoint for answering callers, screening calls, placing confirmed outbound calls, booking appointments, taking messages, logging transcripts, resolving contacts, and exposing MCP tools via a provider-swappable telephony bridge + OpenAI Realtime. Twilio is the default and recommended provider. Claude Desktop/Cowork and other MCP-capable clients or agent harnesses can use the same phone, CRM, calendar, and call-history capabilities once configured.
 
 **Privacy notice:** Amber handles real communications data. Calls may be processed by Twilio or another voice provider and OpenAI Realtime, and local logs/transcripts are sensitive. CRM persistence is opt-in with `AMBER_CRM_ENABLED=true`; transcript-based CRM enrichment is separately opt-in with `AMBER_CRM_TRANSCRIPT_ENRICHMENT=true`. Configure caller notice/consent, access controls, retention, and deletion practices before using Amber with real callers.
 
-[![ClawHub](https://img.shields.io/badge/ClawHub-amber--voice--assistant-blue)](https://clawhub.ai/skills/amber-voice-assistant)
+[![ClawHub](https://img.shields.io/badge/ClawHub-amber--phone--agent-blue)](https://clawhub.ai/batthis/amber-phone-agent)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ## What is Amber?
 
-Amber is not just a standalone voice bot or virtual receptionist. It operates as an extension of your OpenClaw instance, giving your agent real phone capabilities while delegating complex decisions (calendar lookups, contact resolution, approval workflows) back to OpenClaw mid-call via the `ask_openclaw` tool.
+Amber is not just a standalone voice bot or virtual receptionist. It gives an agent a reachable phone number and the workflow tools to complete calls: call the business, ask the question, book the slot, leave the message, screen the caller, and show the transcript afterward. It operates as an extension of your OpenClaw instance while delegating complex decisions (calendar lookups, contact resolution, approval workflows) back to OpenClaw mid-call via the `ask_openclaw` tool.
 
 ### Features
 
@@ -24,6 +24,12 @@ Amber is not just a standalone voice bot or virtual receptionist. It operates as
 - 📝 **AGENT.md** — customize all prompts, greetings, booking flow, and personality in a single editable markdown file (no code changes needed)
 
 ## 🆕 What's New
+
+### v5.5.50 — Sharper ClawHub Positioning (Aug 2026)
+
+- Reframed the first-screen listing copy around the concrete outcome: give an agent a phone number and let it complete real phone tasks
+- Moved inbound answering, confirmed outbound calling, booking, messages, transcripts, and MCP tools into the opening card language
+- Kept the protected ClawHub display name unchanged: `Amber — Phone-Capable Voice Agent`
 
 ### v5.5.48 — Skill Card Evidence (Jul 2026)
 
