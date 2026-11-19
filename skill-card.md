@@ -1,67 +1,65 @@
-# Amber — Phone-Capable Voice Agent
+## Description:
 
-## Description
-
-Amber gives an agent a real phone number and the tools to complete phone tasks: answer callers, screen calls, place confirmed outbound calls, look up contacts, book appointments, take messages, log transcripts, and expose MCP tools through a Twilio or compatible voice bridge.
+Give Hermes Agent real phone capabilities through Amber's Twilio/OpenAI voice bridge and MCP tools.
 
 This skill is ready for commercial/non-commercial use.
 
-## Publisher
+## Publisher:
 
 [batthis](https://clawhub.ai/user/batthis)
 
-## License/Terms of Use
+### License/Terms of Use:
 
 MIT-0
 
-## Use Case
+## Use Case:
 
-Developers and operators use Amber when they want an agent to handle concrete phone work: call this business, ask this question, book the slot, leave the message, screen this caller, or show what happened after the call. Amber connects those workflows to a real phone number with inbound screening, explicitly confirmed outbound calls, call-history review, contact lookup, CRM caller memory, and calendar-assisted scheduling. The skill is intended for configured deployments where the operator manages telephony, AI-provider credentials, caller notice, access control, and retention practices.
+Developers and operators use Amber to connect an agent to real phone workflows: answer and screen inbound calls, prepare confirmed outbound calls, review call history, resolve contacts, and use calendar or CRM context during phone tasks.
 
-## Deployment Geography for Use
+### Deployment Geography for Use:
 
 Global
 
-## Known Risks and Mitigations
+## Known Risks and Mitigations:
 
-Risk: Amber handles sensitive phone, contact, calendar, transcript, and optional CRM data.
-Mitigation: Operate it as a sensitive communications system: keep logs, transcripts, contact caches, and CRM files private; define retention and deletion practices; and enable CRM enrichment or extended contacts only when needed.
+Risk: Outbound-call confirmation can be bypassed by a caller-supplied MCP flag according to ClawHub security evidence.
 
-Risk: CRM caller memory can retain phone numbers, names, summaries, and contextual notes.
-Mitigation: CRM is opt-in, the setup wizard defaults it to off, and the runtime hides CRM tools unless `AMBER_CRM_ENABLED=true`.
+Mitigation: Review and patch the outbound-call workflow before enabling real calls; require server-side, single-use approval state bound to the exact phone number and objective, or set AMBER_ENABLE_OUTBOUND_CALLS=false until fixed.
 
-Risk: Telephony, AI-provider, and optional OpenClaw credentials can expose real calling and data access if over-scoped or leaked.
-Mitigation: Use dedicated least-privilege Twilio, OpenAI, and OpenClaw credentials, keep secrets out of logs, rotate them when needed, and review dependency and configuration changes before deployment.
+Risk: Phone calls, transcripts, contact data, local CRM records, and calendar data can contain sensitive communications and personal information.
 
-Risk: A locally served bridge or dashboard may expose call controls or communications records if made reachable without protection.
-Mitigation: Keep the bridge and dashboard loopback-only or place them behind authentication and network controls before using real callers.
+Mitigation: Use clear caller notice and consent, define retention and deletion practices, restrict access to local logs and CRM data, and enable CRM or transcript enrichment only when those controls are in place.
 
-Risk: Real calls may involve people who did not configure the system and may be recorded or transcribed.
-Mitigation: Configure caller notice and consent appropriate to the deployment, and require explicit confirmation before outbound calls, calendar writes, payments, commitments, or escalation-sensitive actions.
+Risk: Provider credentials and webhook endpoints can be abused if reused broadly or left weakly validated.
 
-## References
+Mitigation: Use a dedicated Twilio subaccount, a dedicated OpenAI project key, BRIDGE_API_TOKEN, strict webhook validation, least-privilege gateway credentials, and regular credential rotation.
 
-- [ClawHub skill page](https://clawhub.ai/batthis/amber-phone-agent)
-- [Amber repository](https://github.com/batthis/amber-openclaw-voice-agent)
-- [Architecture](references/architecture.md)
+Risk: Flagged dependencies may expose production deployments to known vulnerabilities.
+
+Mitigation: Update flagged dependencies before production deployment and review dependency changes against the pinned lockfiles.
+
+## Reference(s):
+
+- [ClawHub listing](https://clawhub.ai/batthis/skills/amber-phone-agent)
+- [Publisher profile](https://clawhub.ai/user/batthis)
+- [OpenClaw](https://openclaw.ai)
+- [Architecture notes](references/architecture.md)
 - [Release checklist](references/release-checklist.md)
-- [Runtime README](runtime/README.md)
-- [Cowork package README](packaging/cowork/README.md)
 
-## Skill Output
+## Skill Output:
 
-**Output Type(s):** guidance, shell commands, configuration
+**Output Type(s):** [Guidance, Shell commands, Configuration, Markdown, Code]
 
-**Output Format:** Markdown instructions with code blocks and configuration snippets
+**Output Format:** [Markdown guidance with shell commands and YAML configuration snippets]
 
-**Output Parameters:** 1D
+**Output Parameters:** [1D]
 
-**Other Properties Related to Output:** Outputs are operator-facing setup, verification, and usage guidance for connecting Amber runtime and MCP tools to an agent.
+**Other Properties Related to Output:** [Guides MCP setup, runtime verification, and phone workflow safety checks; the configured runtime may produce call logs, transcripts, CRM records, calendar actions, and MCP tool responses.]
 
-## Skill Version(s)
+## Skill Version(s):
 
-5.5.50
+5.5.50 (source: server release metadata and skill frontmatter)
 
-## Ethical Considerations
+## Ethical Considerations:
 
 Users should evaluate whether this skill is appropriate for their environment, review any generated or modified files before relying on them, and apply their organization's safety, security, and compliance requirements before deployment.

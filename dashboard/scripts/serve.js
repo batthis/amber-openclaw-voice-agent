@@ -37,15 +37,11 @@ if (args.help) {
 }
 
 const root = path.resolve(__dirname, '..');
+const { resolveBridgeCredential } = require('../../runtime/bridge-credential.cjs');
 
 function isAllowedOrigin(origin) {
-  if (!origin) return false;
-  try {
-    const u = new URL(origin);
-    return ['127.0.0.1', 'localhost', '::1', '[::1]'].includes(u.hostname);
-  } catch (_) {
-    return false;
-  }
+  if (typeof origin !== 'string') return false;
+  return [`http://127.0.0.1:${args.port}`, `http://localhost:${args.port}`, `http://[::1]:${args.port}`].includes(origin);
 }
 
 function readJsonBody(req, limitBytes = 8192) {
@@ -90,6 +86,17 @@ const ALLOWED_REALTIME_MODELS = new Set(['gpt-realtime', 'gpt-realtime-mini']);
 
 const server = http.createServer((req, res) => {
   const origin = req.headers.origin;
+  const allowedHosts = new Set([`127.0.0.1:${args.port}`, `localhost:${args.port}`, `[::1]:${args.port}`]);
+  if (!allowedHosts.has(req.headers.host)) return sendJson(res, 403, { error: 'Invalid dashboard Host' });
+  const ownOrigin = `http://${req.headers.host}`;
+  if (origin && origin !== ownOrigin) return sendJson(res, 403, { error: 'Cross-origin request denied' });
+  if (req.headers['sec-fetch-site'] && req.headers['sec-fetch-site'] !== 'same-origin' && req.headers['sec-fetch-site'] !== 'none') {
+    return sendJson(res, 403, { error: 'Cross-site request denied' });
+  }
+  if (req.method === 'POST' && (origin !== ownOrigin || !/^application\/json(?:;|$)/i.test(req.headers['content-type'] || ''))) {
+    return sendJson(res, 403, { error: 'Same-origin JSON POST required' });
+  }
+
   if (isAllowedOrigin(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Vary', 'Origin');
@@ -106,11 +113,13 @@ const server = http.createServer((req, res) => {
   // POST /api/call — loopback-only proxy to Amber bridge /call/outbound.
   // Keeping this same-origin avoids browser CORS issues while still refusing
   // non-local bridge targets so the dashboard cannot become a generic proxy.
-  if (req.method === 'POST' && req.url === '/api/call') {
+  if (req.method === 'POST' && ['/api/call', '/api/call/preview'].includes(req.url)) {
     readJsonBody(req)
       .then(async body => {
         const bridgeUrl = String(body.bridgeUrl || 'http://127.0.0.1:8000').replace(/\/+$/, '');
-        const bridgeToken = String(body.bridgeToken || '');
+        // Auto-share the installation secret only with its configured bridge, never an arbitrary local URL.
+        const configuredBridgeUrl = String(process.env.AMBER_BRIDGE_URL || 'http://127.0.0.1:8000').replace(/\/+$/, '');
+        const bridgeToken = String(body.bridgeToken || (bridgeUrl === configuredBridgeUrl ? resolveBridgeCredential(path.join(root, '..', 'runtime')) : ''));
         const to = String(body.to || '').trim();
         const objective = String(body.objective || '').trim();
         const model = String(body.model || 'gpt-realtime').trim();
@@ -135,10 +144,10 @@ const server = http.createServer((req, res) => {
         const headers = { 'Content-Type': 'application/json' };
         if (bridgeToken) headers.Authorization = `Bearer ${bridgeToken}`;
 
-        const upstream = await fetch(`${bridgeUrl}/call/outbound`, {
+        const upstream = await fetch(`${bridgeUrl}${req.url === '/api/call/preview' ? '/call/preview' : '/call/outbound'}`, {
           method: 'POST',
           headers,
-          body: JSON.stringify({ to, objective, model })
+          body: JSON.stringify({ to, objective, model, confirmed: body.confirmed === true, approvalToken: body.approvalToken })
         });
         const text = await upstream.text();
         let payload;

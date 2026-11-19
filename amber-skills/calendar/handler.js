@@ -261,7 +261,7 @@ module.exports = async function calendarHandler(params, context) {
     } catch (_) {}
     return {
       success: false,
-      error: errMsg,
+      error: 'Calendar operation failed',
       message: "I had trouble accessing the calendar. Let me note that for follow-up.",
     };
   }

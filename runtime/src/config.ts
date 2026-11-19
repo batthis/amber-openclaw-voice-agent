@@ -1,12 +1,17 @@
 import path from 'node:path';
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+const credentialHelper = createRequire(import.meta.url)('../bridge-credential.cjs');
+const runtimeDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 export const RUNTIME_PORT = Number(process.env.PORT ?? 8000);
 export const GATEWAY_BASE_URL = process.env.OPENCLAW_GATEWAY_URL ?? 'http://127.0.0.1:18789';
 export const DEFAULT_OPENAI_VOICE = process.env['OPENAI_' + 'VOICE'] ?? 'alloy';
 export const GATEWAY_CREDENTIAL = process.env['OPENCLAW_' + 'GATEWAY_' + 'TOKEN'] ?? '';
-export const BRIDGE_CREDENTIAL = process.env['BRIDGE_' + 'API_' + 'TOKEN'] ?? '';
+export const BRIDGE_CREDENTIAL: string = credentialHelper.resolveBridgeCredential(runtimeDir);
 export const PROVIDER_WEBHOOK_STRICT = process.env['TWILIO_' + 'WEBHOOK_' + 'STRICT'] !== 'false';
-export const OPENAI_WEBHOOK_STRICT = process.env['OPENAI_' + 'WEBHOOK_' + 'STRICT'] === 'true';
+// Signed OpenAI events are mandatory; do not silently accept forged events.
+export const OPENAI_WEBHOOK_STRICT = true;
 export const IS_PRODUCTION_RUNTIME = process.env.NODE_ENV === 'production';
 export const IS_TEST_RUNTIME = process.env.NODE_ENV === 'test';
 export const OUTBOUND_CALLS_ENABLED = process.env['AMBER_' + 'ENABLE_' + 'OUTBOUND_CALLS'] !== 'false';
@@ -85,7 +90,7 @@ export function getTelnyxRuntimeConfig() {
 export function getMcpRuntimeConfig(dirname: string) {
   return {
     bridgeUrl: process.env.AMBER_BRIDGE_URL ?? 'http://127.0.0.1:8000',
-    bridgeCredential: process.env['BRIDGE_' + 'API_' + 'TOKEN'] ?? '',
+    bridgeCredential: BRIDGE_CREDENTIAL,
     operatorName: process.env.OPERATOR_NAME ?? '',
     logsDir: process.env.AMBER_LOGS_DIR ?? path.join(dirname, '..', 'logs'),
     outboundCallsEnabled: OUTBOUND_CALLS_ENABLED,

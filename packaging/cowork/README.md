@@ -18,7 +18,7 @@ Give Claude a phone. Amber is the first voice/telephony plugin for Claude — ma
 - [Twilio account](https://www.twilio.com/) with a phone number
 - [OpenAI API key](https://platform.openai.com/) (for voice STT/TTS)
 - [ngrok account](https://ngrok.com/) (for webhook tunneling)
-- Node.js 18+
+- Node.js 20+
 
 ## Setup
 

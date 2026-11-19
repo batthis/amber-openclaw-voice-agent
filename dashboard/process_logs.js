@@ -478,17 +478,6 @@ function parseJsonlStats(filePath) {
         startedAt: null,
         endedAt: null,
         durationMs: null,
-        wsOpenAt: null,
-        firstCallerTranscriptAt: null,
-        firstResponseDoneAt: null,
-        firstAudioDeltaAt: null,
-        firstToolStartAt: null,
-        lastToolDoneAt: null,
-        toolCalls: [],
-        fillerCount: 0,
-        latencyFollowupCount: 0,
-        interruptionCount: 0,
-        errorCount: 0,
         totalTokens: 0,
         inputTokens: 0,
         outputTokens: 0,
@@ -519,60 +508,6 @@ function parseJsonlStats(filePath) {
         }
 
         const event = row.event || row;
-        const eventType = String(event?.type || row?.type || '');
-        if (row?.type === 'ws.open' && stats.wsOpenAt === null && Number.isFinite(ts)) {
-            stats.wsOpenAt = ts;
-        }
-        if (eventType === 'conversation.item.input_audio_transcription.completed' && stats.firstCallerTranscriptAt === null && Number.isFinite(ts)) {
-            stats.firstCallerTranscriptAt = ts;
-        }
-        if ((eventType === 'response.audio.delta' || eventType === 'response.output_audio.delta') && stats.firstAudioDeltaAt === null && Number.isFinite(ts)) {
-            stats.firstAudioDeltaAt = ts;
-        }
-        if (eventType === 'response.done' && stats.firstResponseDoneAt === null && Number.isFinite(ts)) {
-            stats.firstResponseDoneAt = ts;
-        }
-        if (eventType === 'input_audio_buffer.speech_started' || eventType.includes('interrupt')) {
-            stats.interruptionCount += 1;
-        }
-        if (eventType === 'error' || row?.type === 'ws.error' || String(row?.type || '').endsWith('.error')) {
-            stats.errorCount += 1;
-        }
-        if (row?.type === 'c2.filler_sent' || row?.type === 'c2.skill_filler_sent') {
-            stats.fillerCount += 1;
-        }
-        if (row?.type === 'c2.ask_openclaw.latency_followup' || row?.type === 'c2.skill_latency_followup' || row?.type === 'c2.smalltalk_followup') {
-            stats.latencyFollowupCount += 1;
-        }
-        if ((row?.type === 'c2.ask_openclaw.start' || row?.type === 'c2.skill_call') && Number.isFinite(ts)) {
-            const kind = row?.type === 'c2.ask_openclaw.start' ? 'gateway' : 'skill';
-            const name = kind === 'gateway' ? 'ask_openclaw' : (row.fn_name || row.skill_name || 'skill');
-            const toolCall = {
-                kind,
-                name,
-                startedAt: ts,
-                endedAt: null,
-                durationMs: null,
-                success: null,
-                error: null,
-            };
-            stats.toolCalls.push(toolCall);
-            if (stats.firstToolStartAt === null || ts < stats.firstToolStartAt) stats.firstToolStartAt = ts;
-        }
-        if ((row?.type === 'c2.ask_openclaw.done' || row?.type === 'c2.ask_openclaw.error' || row?.type === 'c2.skill_result' || row?.type === 'c2.skill_error') && Number.isFinite(ts)) {
-            const kind = row?.type.startsWith('c2.ask_openclaw') ? 'gateway' : 'skill';
-            const name = kind === 'gateway' ? 'ask_openclaw' : (row.fn_name || row.skill_name || 'skill');
-            const match = [...stats.toolCalls].reverse().find(t => t.kind === kind && t.name === name && t.endedAt === null);
-            if (match) {
-                match.endedAt = ts;
-                match.durationMs = Math.max(0, ts - match.startedAt);
-                match.success = !String(row?.type || '').endsWith('.error') && row.success !== false;
-                match.error = row.error || null;
-                stats.lastToolDoneAt = ts;
-            }
-            if (String(row?.type || '').endsWith('.error')) stats.errorCount += 1;
-        }
-
         if (event?.type === 'response.done' && event.response?.usage) {
             stats.responseCount += 1;
             addUsage(stats, event.response.usage);
@@ -587,69 +522,6 @@ function parseJsonlStats(filePath) {
     }
 
     return stats;
-}
-
-function average(numbers) {
-    const vals = numbers.filter(n => Number.isFinite(n));
-    if (!vals.length) return null;
-    return vals.reduce((sum, n) => sum + n, 0) / vals.length;
-}
-
-function percentile(numbers, p) {
-    const vals = numbers.filter(n => Number.isFinite(n)).sort((a, b) => a - b);
-    if (!vals.length) return null;
-    const idx = Math.min(vals.length - 1, Math.max(0, Math.ceil(vals.length * p) - 1));
-    return vals[idx];
-}
-
-function buildQualityMetrics(jsonlStats) {
-    const toolDurations = jsonlStats.toolCalls.map(t => t.durationMs).filter(n => Number.isFinite(n));
-    const failedTools = jsonlStats.toolCalls.filter(t => t.success === false).length;
-    const firstResponseMs = jsonlStats.wsOpenAt !== null && jsonlStats.firstResponseDoneAt !== null
-        ? Math.max(0, jsonlStats.firstResponseDoneAt - jsonlStats.wsOpenAt)
-        : null;
-    const firstAudioMs = jsonlStats.wsOpenAt !== null && jsonlStats.firstAudioDeltaAt !== null
-        ? Math.max(0, jsonlStats.firstAudioDeltaAt - jsonlStats.wsOpenAt)
-        : null;
-    const toolAvgMs = average(toolDurations);
-    const toolP95Ms = percentile(toolDurations, 0.95);
-    const deadAirRiskMs = toolDurations.length
-        ? Math.max(...toolDurations.map(ms => Math.max(0, ms - 8000)))
-        : 0;
-
-    let score = 100;
-    if (firstAudioMs !== null && firstAudioMs > 1800) score -= Math.min(20, Math.round((firstAudioMs - 1800) / 250));
-    if (firstResponseMs !== null && firstResponseMs > 4000) score -= Math.min(12, Math.round((firstResponseMs - 4000) / 500));
-    if (toolP95Ms !== null && toolP95Ms > 10000) score -= Math.min(22, Math.round((toolP95Ms - 10000) / 1000) * 2);
-    score -= Math.min(24, failedTools * 12 + jsonlStats.errorCount * 6);
-    score -= Math.min(10, Math.round(deadAirRiskMs / 4000));
-    if (jsonlStats.fillerCount || jsonlStats.latencyFollowupCount) score += Math.min(8, jsonlStats.fillerCount * 2 + jsonlStats.latencyFollowupCount);
-    score = Math.max(0, Math.min(100, score));
-
-    return {
-        score,
-        firstResponseMs,
-        firstAudioMs,
-        firstCallerTranscriptMs: jsonlStats.wsOpenAt !== null && jsonlStats.firstCallerTranscriptAt !== null
-            ? Math.max(0, jsonlStats.firstCallerTranscriptAt - jsonlStats.wsOpenAt)
-            : null,
-        toolCallCount: jsonlStats.toolCalls.length,
-        failedToolCount: failedTools,
-        toolAvgMs,
-        toolP95Ms,
-        deadAirRiskMs,
-        fillerCount: jsonlStats.fillerCount,
-        latencyFollowupCount: jsonlStats.latencyFollowupCount,
-        interruptionCount: jsonlStats.interruptionCount,
-        errorCount: jsonlStats.errorCount,
-        toolCalls: jsonlStats.toolCalls.map(t => ({
-            kind: t.kind,
-            name: t.name,
-            durationMs: t.durationMs,
-            success: t.success,
-            error: t.error,
-        })),
-    };
 }
 
 async function processLogs() {
@@ -827,7 +699,6 @@ async function processLogsWithOptions(options) {
                     hasCapturedMessage: capturedMessages.length > 0,
                     callSummary,
                     duration: jsonlStats.durationMs,
-                    quality: buildQualityMetrics(jsonlStats),
                     usage: {
                         totalTokens: jsonlStats.totalTokens,
                         inputTokens: jsonlStats.inputTokens,
