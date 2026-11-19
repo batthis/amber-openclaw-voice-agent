@@ -17,9 +17,12 @@ Maintainer documentation includes optional ClawHub publishing and demo-recording
 
 ## Try asking your agent
 
+- “Call the repair shop, ask when my car will be ready and what I need to bring, then report back. Show me the phone number and objective before dialing.”
 - “Screen my incoming calls and take a message with a callback number.”
 - “Prepare a call to the restaurant to ask about a table for four at 7 p.m.; show me the details before dialing.”
 - “Check my availability for Friday afternoon and help the caller confirm an appointment.”
+
+Run `node demo/first-call-demo.js` from the project root to walk through the repair-shop example with fictional dialogue and no phone call. [Phone task demo](demo/README.md)
 
 ## What you need
 
@@ -50,6 +53,12 @@ Amber is not just a standalone voice bot or virtual receptionist. It gives an ag
 - 📝 **AGENT.md** — customize all prompts, greetings, booking flow, and personality in a single editable markdown file (no code changes needed)
 
 ## 🆕 What's New
+
+### v5.5.55 — First-call setup check
+
+- Check the active OpenClaw skill, bridge version, public tunnel, and Twilio and OpenAI webhook signatures from the setup wizard.
+- Retry the checks with `npm run setup -- --check` after changing your configuration.
+- Try a simulated repair-shop call from approval through the pickup instructions with `node demo/first-call-demo.js`.
 
 ### v5.5.50 — Sharper ClawHub Positioning (Aug 2026)
 
@@ -91,7 +100,14 @@ See [CRM skill docs](#-crm--contact-memory) below for details.
 
 ## Quick Start
 
-The setup wizard asks whether to enable local CRM caller memory. It defaults to off; enable it only when you have caller notice/consent and retention practices in place.
+The setup wizard saves your configuration and walks you through starting the bridge and configuring the public webhooks. It then checks readiness before your first test call. [First-call check](runtime/README.md#check-readiness-for-your-first-call)
+
+```bash
+cd runtime
+npm run setup
+```
+
+### Manual setup
 
 ```bash
 cd runtime && npm ci
@@ -101,7 +117,7 @@ cp ../references/env.example .env  # fill in your values
 npm run build && npm start
 ```
 
-Point your Twilio voice webhook to `https://<your-domain>/twilio/inbound` — done!
+Point your Twilio voice webhook to `https://<your-domain>/twilio/inbound` and your OpenAI Realtime incoming-call webhook to `https://<your-domain>/openai/webhook`. In another terminal, run `npm run setup -- --check` before calling your Twilio number.
 
 > **Switching providers?** Set `VOICE_PROVIDER=telnyx` (or another supported provider) in your `.env` — no code changes needed. See [SKILL.md](SKILL.md) for details.
 

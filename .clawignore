@@ -6,7 +6,9 @@ runtime/.env.*
 runtime/contacts-cache.json
 amber-skills/crm/node_modules/
 amber-skills/calendar/node_modules/
-demo/
+demo/demo.cast
+demo/demo.exp
+demo/demo.gif
 runtime/data/
 data/
 dashboard/data/

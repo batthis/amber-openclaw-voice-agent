@@ -26,23 +26,14 @@ A production-ready Twilio + OpenAI Realtime SIP bridge that enables voice conver
 
 ### 2. Interactive Setup (Recommended) ✨
 
-![Setup Wizard Demo](../demo/demo.gif)
-
-Run the setup wizard for guided installation:
+Run the setup wizard from the Amber skill folder:
 
 ```bash
-cd skills/amber-voice-assistant/runtime
+cd runtime
 npm run setup
 ```
 
-The wizard will:
-- ✅ Validate your Twilio and OpenAI credentials in real-time
-- 🌐 Auto-detect and configure ngrok if available
-- 📝 Generate a working `.env` file
-- 🔧 Optionally install dependencies and build the project
-- 📋 Show you exactly where to configure Twilio webhooks
-
-Then just start the server and call your number!
+The wizard validates your Twilio and OpenAI credentials, offers to reuse a running ngrok tunnel, and saves your settings in `.env`. It shows the commands to build and start Amber and the URLs to enter in the Twilio and OpenAI consoles. Return to the wizard after setup to run the [first-call check](#check-readiness-for-your-first-call).
 
 ### 3. Manual Configuration (Alternative)
 
@@ -126,6 +117,16 @@ https://your-domain.com/openai/webhook
 ```
 
 And configure the webhook secret in your `.env`.
+
+## Check readiness for your first call
+
+At the end of `npm run setup`, keep the wizard open while you build and start the bridge in another terminal and configure your provider webhooks. Press Enter to check readiness. If you deferred the check or made changes, rerun it without re-entering credentials:
+
+```bash
+npm run setup -- --check
+```
+
+For an OpenClaw setup, Amber checks the active skill version along with the running bridge version, then confirms the public HTTPS URL reaches that bridge. Amber sends no-call probes to verify that Twilio and OpenAI webhook signatures are enforced. These probes do not dial, accept an incoming call, or verify the settings saved in the provider dashboards.
 
 ## Environment Variables Reference
 

@@ -8,6 +8,7 @@ import { chmodSync, existsSync, writeFileSync, readFileSync } from 'node:fs';
 import { access } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
+import { runFirstCallCheck } from './first-call-check.js';
 
 // ── Colours ──────────────────────────────────────────────────────────
 const c = {
@@ -466,9 +467,10 @@ ${c.bold}${c.cyan}╔═══════════════════�
   }
 
   // ── Summary ────────────────────────────────────────────────────────
-  head('All Done! 🎉');
+  head('First Call Setup');
 
-  const webhookUrl = `${cfg.PUBLIC_BASE_URL}/twilio/inbound`;
+  const publicBaseUrl = cfg.PUBLIC_BASE_URL.replace(/\/+$/, '');
+  const webhookUrl = `${publicBaseUrl}/twilio/inbound`;
   const hasNativeTools = process.platform === 'darwin' &&
     existsSync(resolve(__dirname, '..', 'tools', 'ical-query'));
   const hasContactsCache = isCowork && existsSync(resolve(__dirname, 'contacts-cache.json'));
@@ -486,12 +488,14 @@ ${c.bold}Next steps:${c.reset}
      Go to ${c.bold}https://console.twilio.com${c.reset} → Phone Numbers → ${cfg.TWILIO_CALLER_ID}
      Set Voice webhook (HTTP POST) to:
      ${c.green}${c.bold}${webhookUrl}${c.reset}
+     In your OpenAI project, set the Realtime incoming call webhook to:
+     ${c.green}${c.bold}${publicBaseUrl}/openai/webhook${c.reset}
 
-  2. ${c.cyan}Start the server:${c.reset}
+  2. ${c.cyan}Start the bridge in another terminal:${c.reset}
      ${c.bold}npm start${c.reset}
 
-  3. ${c.cyan}Test it:${c.reset}
-     Call ${c.bold}${cfg.TWILIO_CALLER_ID}${c.reset} — your voice assistant should answer!
+  3. ${c.cyan}Check readiness before dialing:${c.reset}
+     The check verifies the running bridge, public URL, and webhook signatures.
 ${hasNativeTools ? `
   4. ${c.cyan}Calendar access:${c.reset}
      ical-query compiled and configured.
@@ -505,10 +509,22 @@ ${hasNativeTools ? `
 ${c.dim}Config saved to: ${envPath}${c.reset}
 `);
 
+  const choice = await ask('Press Enter when the bridge and tunnel are up, or type later to skip');
+  if (choice.toLowerCase() === 'later') {
+    info('When you are ready, run npm run setup -- --check.');
+  } else if (await runFirstCallCheck()) {
+    info(`Call ${cfg.TWILIO_CALLER_ID} to hear Amber answer.`);
+  } else {
+    process.exitCode = 1;
+  }
   rl.close();
 }
 
-main().catch((err) => {
+const run = process.argv.includes('--check')
+  ? async () => { if (!(await runFirstCallCheck())) process.exitCode = 1; }
+  : main;
+
+run().catch((err) => {
   if (err.code === 'ERR_USE_AFTER_CLOSE' || err.message?.includes('readline was closed')) {
     // user hit Ctrl+C
     console.log(`\n${c.yellow}Setup cancelled.${c.reset}`);

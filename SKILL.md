@@ -50,13 +50,11 @@ Privacy defaults: local CRM lookup/logging is disabled unless `AMBER_CRM_ENABLED
 
 **✨ Also:** Interactive setup wizard (`npm run setup`) validates credentials in real-time and generates a working `.env` file — no manual configuration needed. Once setup is complete, Amber is prompt-based: ask your OpenClaw agent to prepare confirmed calls, answer/screen callers, schedule confirmed appointments, or handle phone workflows in natural language.
 
-## Setup walkthrough
+## See a phone task from prompt to result
 
-![Setup Wizard Demo](demo/demo.gif)
+Run `node demo/first-call-demo.js` from the skill folder to see a simulated OpenClaw phone task with recipient and objective approval, a call excerpt, and a result. [Demo instructions](demo/README.md)
 
-**[▶️ Watch the interactive demo on asciinema.org](https://asciinema.org/a/l1nOHktunybwAheQ)** (copyable text, adjustable speed)
-
-*The interactive wizard validates credentials, detects ngrok, and generates a complete `.env` file in minutes.*
+The [setup wizard recording](https://asciinema.org/a/l1nOHktunybwAheQ) shows the configuration prompts.
 
 ### What's included
 
@@ -154,25 +152,12 @@ Do not reuse example values from another operator.
 
 ### Option A: Interactive Setup Wizard (recommended) ✨
 
-The easiest way to get started:
+1. Run `cd runtime` and `npm run setup`.
+2. Follow the prompts to validate credentials, choose a tunnel URL, and save your configuration.
+3. Follow the wizard’s instructions to build and start the bridge in another terminal and configure the Twilio and OpenAI webhooks.
+4. Return to the wizard and press Enter to check readiness. After the checks pass, call your Twilio number to test Amber.
 
-1. `cd runtime`
-2. `npm run setup`
-3. Follow the interactive prompts — the wizard will:
-   - Validate your Twilio and OpenAI credentials in real-time
-   - Auto-detect and configure ngrok if available
-   - Ask whether to enable opt-in local CRM caller memory
-   - Generate a working `.env` file
-   - Optionally install dependencies and build the project
-4. Configure your Twilio webhook (wizard shows you the exact URL)
-5. Start the server: `npm start`
-6. Call your Twilio number — your voice assistant answers!
-
-**Benefits:**
-- Real-time credential validation (catch errors before you start)
-- No manual `.env` editing
-- Automatic ngrok detection and setup
-- Step-by-step guidance with helpful links
+To retry the check without re-entering credentials, run `npm run setup -- --check`.
 
 ### Option B: Manual setup
 

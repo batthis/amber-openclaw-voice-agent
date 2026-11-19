@@ -17,6 +17,8 @@ import { CallApprovals, verifyOpenAIWebhook, crmGreetingData } from './security.
 import { consultationData, callSessionKey } from './trust-boundaries.js';
 
 const callApprovals = new CallApprovals();
+const bridgeInstance = crypto.randomUUID();
+const bridgeVersion = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
 // ─── Security Helpers ───
 
 /**
@@ -439,7 +441,13 @@ const gatewayClientOptions: ConstructorParameters<typeof OpenAI>[0] = {
 (gatewayClientOptions as Record<string, unknown>)['api' + 'Key'] = gatewayCredential;
 const clawdClient = new OpenAI(gatewayClientOptions);
 
-app.get('/healthz', (_req, res) => res.status(200).json({ ok: true }));
+app.get('/healthz', (_req, res) => {
+  res.set({
+    'Cache-Control': 'no-store',
+    'X-Amber-Version': bridgeVersion,
+    'X-Amber-Instance': bridgeInstance,
+  }).json({ ok: true });
+});
 
 /**
  * POST /openclaw/ask

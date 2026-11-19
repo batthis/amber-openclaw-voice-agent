@@ -1,4 +1,14 @@
-# Amber Voice Assistant - Setup Wizard Demo
+# Amber phone task demo
+
+From the Amber project root, run:
+
+```bash
+node demo/first-call-demo.js
+```
+
+Follow a repair-shop inquiry from the original OpenClaw prompt through recipient and objective approval, a short call excerpt, and the pickup instructions. The walkthrough uses fictional dialogue and works without credentials, OpenClaw, or a running bridge.
+
+## Setup wizard recording
 
 This directory contains demo recordings of the interactive setup wizard.
 
