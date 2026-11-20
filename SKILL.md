@@ -18,6 +18,10 @@ Use it when you want an agent to do the plain-English phone job: call this busin
 
 Beyond phone calls, configured MCP clients can query availability and create calendar events through `ical-query`, and independently use optional CRM contact creation, updates, history, and interaction logging. Calendar writes require explicit confirmation. Contact lookup uses an operator-generated local Apple Contacts cache; the sync helper exports contact names/numbers, with optional extended notes, relationships, and addresses only when `AMBER_CONTACTS_EXTENDED=true`. CRM and transcript enrichment remain separately opt-in. Review local cache, database and transcript retention before use.
 
+Automatic inbound CRM attribution and personalized greetings require the call reference Amber creates from a signed Twilio webhook. An inbound call without a matching reference still goes through screening under the default greeting.
+
+The authenticated MCP screening controls pause or resume new inbound calls. While paused, Amber returns a busy response on its Twilio number. Calls already connected and confirmed outbound calls can continue. The preference is saved under the bridge’s working directory and persists across restarts. Configure forwarding separately in Twilio if you need a human fallback.
+
 Maintainer documentation includes optional ClawHub publishing and demo-recording upload commands. Those commands are manual release/demo workflows, not actions performed at runtime or during installation.
 
 ## Security upgrade notes

@@ -128,6 +128,12 @@ npm run setup -- --check
 
 For an OpenClaw setup, Amber checks the active skill version along with the running bridge version, then confirms the public HTTPS URL reaches that bridge. Amber sends no-call probes to verify that Twilio and OpenAI webhook signatures are enforced. These probes do not dial, accept an incoming call, or verify the settings saved in the provider dashboards.
 
+## Pause or resume inbound screening
+
+Use the authenticated MCP tools `stop_screening` and `start_screening`. When paused, new inbound calls to Amber receive a busy response. Amber can still place confirmed outbound calls, and calls already connected can finish. The setting persists across bridge restarts.
+
+Amber uses an opaque, call-specific reference issued by the signed Twilio inbound webhook to match the Realtime call to its caller record. Custom SIP flows without that reference can still use generic screening. They do not automatically look up a CRM record or attach the call to one.
+
 ## Environment Variables Reference
 
 ### Required

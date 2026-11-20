@@ -98,7 +98,7 @@ function buildMcpSkillContext() {
       if (!allowedBins.has(baseBin) && !allowedBins.has(file)) {
         throw new Error(`Permission denied: binary "${baseBin}" not allowed`);
       }
-      return runLocalHelper(file, args);
+      return runLocalHelper(file, args, { allowedBinaries: [...allowedBins] });
     },
 
     callLog: {
@@ -261,7 +261,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     {
       name: 'start_screening',
       description:
-        'Enable inbound call screening. Amber will answer incoming calls, ' +
+        'Resume inbound call screening. Amber will answer new incoming calls, ' +
         'identify the caller, take a message, and deliver a structured summary.',
       inputSchema: {
         type: 'object' as const,
@@ -270,7 +270,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: 'stop_screening',
-      description: 'Disable inbound call screening. Calls will ring through normally.',
+      description: 'Pause inbound call screening. Amber declines new incoming calls as busy until screening is resumed.',
       inputSchema: {
         type: 'object' as const,
         properties: {},
@@ -534,35 +534,17 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         return { content: [{ type: 'text', text: formatted.join('\n\n') }] };
       }
 
-      case 'start_screening': {
-        // The bridge handles screening automatically when running.
-        // This is a status confirmation — use GET /healthz directly.
-        try {
-          const res = await fetch(`${BRIDGE_URL}/healthz`);
-          const data = await res.json();
-          if (!data.ok) throw new Error('unhealthy');
-          return {
-            content: [{
-              type: 'text',
-              text: 'Call screening is active. Amber is answering incoming calls on your Twilio number. Summaries will appear in your call history.',
-            }],
-          };
-        } catch {
-          return {
-            content: [{
-              type: 'text',
-              text: 'The Amber bridge is not running. Start it with `npm start` in the runtime directory, then screening will activate automatically.',
-            }],
-            isError: true,
-          };
-        }
-      }
-
+      case 'start_screening':
       case 'stop_screening': {
+        const enabled = name === 'start_screening';
+        const result = await bridgeRequest('/screening', { enabled });
+        if (result.enabled !== enabled) throw new Error('The Amber bridge did not confirm the screening change');
         return {
           content: [{
             type: 'text',
-            text: 'To stop screening, shut down the Amber bridge process. While the bridge is running, it automatically answers inbound calls.',
+            text: enabled
+              ? 'Call screening is active. Amber will answer new incoming calls.'
+              : 'Call screening is paused. Amber will decline new incoming calls as busy. Active calls and outbound calling remain available.',
           }],
         };
       }

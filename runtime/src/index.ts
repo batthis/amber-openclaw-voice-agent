@@ -301,6 +301,7 @@ function validateProviderWebhook(req: Request, res: Response, next: express.Next
     console.warn('PROVIDER_WEBHOOK_INVALID_SIGNATURE', { path: req.path, provider: VOICE_PROVIDER, url });
   }
 
+  res.locals.providerWebhookVerified = isValid;
   next();
 }
 
@@ -347,17 +348,45 @@ type InboundCallInfo = {
   callSid: string;
   from: string;
   receivedAtMs: number;
+  realtimeCallId?: string;
 };
 
 type InboundCallScreeningStyle = 'friendly' | 'genz';
 
 const INBOUND_CALL_LOOKBACK_MS = 2 * 60 * 1000;
-const INBOUND_CALL_RETENTION_MS = 10 * 60 * 1000;
-
-const inboundCallBySid = new Map<string, InboundCallInfo>();
+const inboundCallByToken = new Map<string, InboundCallInfo>();
 
 // JSON endpoints
 app.use('/call', express.json());
+app.use('/screening', express.json());
+
+const screeningStatePath = path.join(process.cwd(), 'data', 'screening.json');
+let screeningEnabled = true;
+try {
+  const state = JSON.parse(fs.readFileSync(screeningStatePath, 'utf8'));
+  if (typeof state.enabled !== 'boolean') throw new Error('Missing screening state');
+  screeningEnabled = state.enabled;
+} catch (error) {
+  if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+    screeningEnabled = false;
+    console.error('Could not read screening state. Inbound screening is paused.');
+  }
+}
+
+app.post('/screening', requireAuth, (req, res) => {
+  const enabled = req.body?.enabled;
+  if (typeof enabled !== 'boolean') return res.status(400).json({ error: 'enabled must be a boolean' });
+  const temporary = `${screeningStatePath}.${process.pid}.tmp`;
+  try {
+    ensureDirSync(path.dirname(screeningStatePath));
+    fs.writeFileSync(temporary, JSON.stringify({ enabled }), { mode: 0o600 });
+    fs.renameSync(temporary, screeningStatePath);
+    screeningEnabled = enabled;
+  } catch {
+    return res.status(500).json({ error: 'Could not save screening state' });
+  }
+  return res.json({ enabled: screeningEnabled });
+});
 app.use('/openclaw', express.json());
 
 // Stores the desired objective/intent for the next outbound call(s), so the OpenAI
@@ -482,7 +511,6 @@ app.post('/openclaw/ask', requireAuth, async (req: Request, res: Response) => {
 app.post('/twilio/status', validateProviderWebhook, (req: Request, res: Response) => {
   try {
     const b = req.body as any;
-    rememberInboundCallFromTwilioBody(b);
     console.log('TWILIO_STATUS', {
       CallSid: b?.CallSid,
       CallStatus: b?.CallStatus,
@@ -514,15 +542,13 @@ app.post('/twilio/status', validateProviderWebhook, (req: Request, res: Response
  * Security: Optional Twilio webhook signature validation (TWILIO_WEBHOOK_STRICT).
  */
 app.post('/twilio/inbound', validateProviderWebhook, async (req: Request, res: Response) => {
-  try {
-    rememberInboundCallFromTwilioBody(req.body as any);
-  } catch (e) {
-    console.error('TWILIO_INBOUND remember error', e);
-  }
+  const inboundToken = screeningEnabled && res.locals.providerWebhookVerified === true
+    ? rememberInboundCall(req.body)
+    : undefined;
   res
     .type(voiceProvider.responseContentType)
     .status(200)
-    .send(voiceProvider.buildSipBridgeResponse());
+    .send(voiceProvider.buildSipBridgeResponse({ inboundToken, reject: !screeningEnabled }));
 });
 
 /**
@@ -681,10 +707,9 @@ app.post('/openai/webhook', async (req: Request, res: Response) => {
 
     const nowMs = Date.now();
 
-    const inbound = findRecentInboundCallForWebhook(event, nowMs);
+    const inbound = findInboundCall(event, callId, nowMs);
     const style = selectInboundCallScreeningStyle(inbound?.from);
 
-    const twilioSid = extractTwilioCallSidFromWebhook(event);
     const bridgeId = extractBridgeIdFromWebhook(event);
 
     // SIP metadata is caller-controlled even when OpenAI signs the enclosing event.
@@ -694,6 +719,9 @@ app.post('/openai/webhook', async (req: Request, res: Response) => {
 
     const outboundCallPlan = bridgeId ? getOutboundCallPlanForKey(bridgeId, nowMs) : undefined;
     const outboundModel = bridgeId ? getOutboundModelForKey(bridgeId, nowMs) : undefined;
+
+    const outboundIntent = bridgeId ? outboundIntentByKey.get(bridgeId) : undefined;
+    if (!outboundIntent && !screeningEnabled) return res.sendStatus(200);
 
     const instructions = outboundObjective
       ? buildOutboundCallInstructions({ objective: outboundObjective, callPlan: outboundCallPlan })
@@ -743,7 +771,7 @@ const callAccept = {
     };
 
     // Debug: log what we think this call is (outbound objective vs inbound screening)
-    const twilioSidForDebug = extractTwilioCallSidFromWebhook(event);
+    const twilioSidForDebug = inbound?.callSid ?? (outboundObjective ? extractTwilioCallSidFromWebhook(event) : undefined);
     writeJsonl({
       type: 'call.intent',
       received_at: new Date().toISOString(),
@@ -776,8 +804,7 @@ const callAccept = {
     // For outbound: always use the 'to' number we dialed (bridgeId → intent.to).
     //   inbound?.from on outbound calls is our own Twilio number (SIP leg quirk) — not the callee.
     // For inbound: use the caller's number from Twilio.
-    const outboundTo = bridgeId ? (outboundIntentByKey.get(bridgeId)?.to ?? null) : null;
-    const callerPhone = outboundTo ?? inbound?.from ?? null;
+    const callerPhone = outboundIntent?.to ?? inbound?.from ?? null;
 
     ws.on('open', () => {
       writeJsonl({ type: 'ws.open', call_id: callId, received_at: new Date().toISOString() });
@@ -1772,37 +1799,32 @@ function normalizePhoneLike(s: unknown): string {
   return s.trim();
 }
 
-function rememberInboundCallFromTwilioBody(body: any): void {
+function rememberInboundCall(body: { CallSid?: unknown; From?: unknown; Caller?: unknown } | undefined): string | undefined {
   const callSid = normalizePhoneLike(body?.CallSid);
   const from = normalizePhoneLike(body?.From || body?.Caller);
-  if (!callSid || !from) return;
+  if (!callSid || !isE164(from)) return undefined;
 
-  const nowMs = Date.now();
-  inboundCallBySid.set(callSid, { callSid, from, receivedAtMs: nowMs });
-  cleanupInboundCalls(nowMs);
+  const now = Date.now();
+  for (const [token, info] of inboundCallByToken) {
+    if (now - info.receivedAtMs > INBOUND_CALL_LOOKBACK_MS) inboundCallByToken.delete(token);
+  }
+  const token = crypto.randomBytes(16).toString('hex');
+  inboundCallByToken.set(token, { callSid, from, receivedAtMs: now });
+  return token;
 }
 
-function cleanupInboundCalls(nowMs: number): void {
-  for (const [sid, info] of inboundCallBySid.entries()) {
-    if (nowMs - info.receivedAtMs > INBOUND_CALL_RETENTION_MS) inboundCallBySid.delete(sid);
-  }
-}
+function findInboundCall(event: any, callId: string, now: number): InboundCallInfo | undefined {
+  const headers = event?.data?.sip_headers;
+  if (!Array.isArray(headers)) return undefined;
 
-function findRecentInboundCallForWebhook(event: any, nowMs: number): InboundCallInfo | undefined {
-  cleanupInboundCalls(nowMs);
+  const matches = headers.filter(header => String(header?.name ?? '').toLowerCase() === 'x-amber-inbound');
+  if (matches.length !== 1) return undefined;
 
-  const candidateSid = extractTwilioCallSidFromWebhook(event);
-  if (candidateSid) {
-    const info = inboundCallBySid.get(candidateSid);
-    if (info && nowMs - info.receivedAtMs <= INBOUND_CALL_LOOKBACK_MS) return info;
-  }
-
-  let best: InboundCallInfo | undefined = undefined;
-  for (const info of inboundCallBySid.values()) {
-    if (nowMs - info.receivedAtMs > INBOUND_CALL_LOOKBACK_MS) continue;
-    if (!best || info.receivedAtMs > best.receivedAtMs) best = info;
-  }
-  return best;
+  const info = inboundCallByToken.get(normalizePhoneLike(matches[0]?.value));
+  if (!info || now - info.receivedAtMs > INBOUND_CALL_LOOKBACK_MS) return undefined;
+  if (info.realtimeCallId && info.realtimeCallId !== callId) return undefined;
+  info.realtimeCallId = callId;
+  return info;
 }
 
 function extractTwilioCallSidFromWebhook(event: any): string | undefined {

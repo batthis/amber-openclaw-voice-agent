@@ -80,7 +80,7 @@ function validateManifest(data: Record<string, any>, skillDir: string): AmberSki
 
   // Defaults
   if (typeof amber.timeout_ms !== 'number') amber.timeout_ms = 5000;
-  if (typeof amber.confirmation_required !== 'boolean') amber.confirmation_required = false;
+  if (typeof amber.confirmation_required !== 'boolean') amber.confirmation_required = amber.capabilities.includes('act');
   if (!amber.permissions) amber.permissions = {};
 
   return { name, version, description, amber };

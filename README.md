@@ -54,6 +54,12 @@ Amber is not just a standalone voice bot or virtual receptionist. It gives an ag
 
 ## 🆕 What's New
 
+### v5.5.57 — Caller attribution and screening controls
+
+- Match inbound CRM attribution to a signed Twilio callback and a call-specific SIP reference.
+- Pause and resume new inbound calls through the authenticated MCP controls. The setting persists across restarts.
+- Require confirmation for built-in calendar writes and message delivery and fix the MCP calendar helper permissions.
+
 ### v5.5.56 — Webhook test fixture
 
 - Generate the synthetic webhook signing key at test time.

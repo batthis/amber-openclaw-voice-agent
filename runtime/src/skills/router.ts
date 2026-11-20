@@ -187,21 +187,18 @@ export async function handleSkillCall(
       confirmed: params.confirmed === true,
     });
 
-    // Router-level confirmation enforcement for 'act' skills.
-    // All 'act' skills require confirmed: true by default.
-    // A skill may opt out by setting its manifest confirmation flag to false,
-    // but only for non-destructive actions (e.g. read-only lookups declared as 'act').
-    // This is a programmatic guarantee enforced at the router level — not left to LLM prompting.
-    const isActSkill = manifest.amber.capabilities.includes('act');
-    if (isActSkill && manifest.amber.confirmation_required !== false) {
-      if (params.confirmed !== true) {
-        deps.sendFunctionCallOutput(ws, fnCallId, JSON.stringify({
-          response: 'This action requires explicit caller confirmation before it can proceed. Please confirm the details with the caller and call this function again with confirmed: true.',
-          success: false,
-          requires_confirmation: true,
-        }));
-        return;
-      }
+    // Keep the confirmation requirement for built-in writes even if a local manifest changes.
+    const requiresConfirmation = fnName === 'calendar_query'
+      ? params.action === 'create'
+      : fnName === 'send_message'
+        || (manifest.amber.capabilities.includes('act') && manifest.amber.confirmation_required !== false);
+    if (requiresConfirmation && params.confirmed !== true) {
+      deps.sendFunctionCallOutput(ws, fnCallId, JSON.stringify({
+        response: 'This action requires explicit caller confirmation before it can proceed. Please confirm the details with the caller and call this function again with confirmed: true.',
+        success: false,
+        requires_confirmation: true,
+      }));
+      return;
     }
 
     // Build constrained API context
