@@ -62,6 +62,7 @@ Amber is not just a standalone voice bot or virtual receptionist. It gives an ag
 
 - Write the local Apple Contacts export with owner-only permissions, including when refreshing an older cache. Basic and extended opt-in exports remain available.
 - Put the optional macOS build watcher's logs under the operator's Library directory. Setup leaves registration of the watcher to the operator.
+- Include the sample configuration and macOS watcher template in ClawHub downloads so the documented manual setup commands work.
 
 ### v5.5.62 — Credential handling and audit follow-up
 
@@ -160,7 +161,7 @@ npm run setup
 cd runtime && npm ci
 cd ../amber-skills/crm && npm ci  # optional, required for AMBER_CRM_ENABLED=true
 cd ../../runtime
-cp ../references/env.example .env  # fill in your values
+cp ../references/env.example.txt .env  # fill in your values
 npm run build && npm start
 ```
 
@@ -190,7 +191,7 @@ To enable it, create the private log directory and register the provided LaunchA
 
 ```bash
 install -d -m 700 ~/Library/Logs/Amber
-cp runtime/scripts/com.jarvis.amber-dist-watcher.plist.example ~/Library/LaunchAgents/com.jarvis.amber-dist-watcher.plist
+cp runtime/scripts/com.jarvis.amber-dist-watcher.plist.xml ~/Library/LaunchAgents/com.jarvis.amber-dist-watcher.plist
 # Edit the plist to match your username/paths
 launchctl load ~/Library/LaunchAgents/com.jarvis.amber-dist-watcher.plist
 ```

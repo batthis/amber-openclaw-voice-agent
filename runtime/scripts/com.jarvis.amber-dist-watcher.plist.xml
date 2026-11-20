@@ -7,7 +7,7 @@
   Setup:
     1. Replace /Users/YOUR_USERNAME with your actual home directory path
     2. install -d -m 700 ~/Library/Logs/Amber
-    3. cp com.jarvis.amber-dist-watcher.plist.example ~/Library/LaunchAgents/com.jarvis.amber-dist-watcher.plist
+    3. cp com.jarvis.amber-dist-watcher.plist.xml ~/Library/LaunchAgents/com.jarvis.amber-dist-watcher.plist
     4. launchctl load ~/Library/LaunchAgents/com.jarvis.amber-dist-watcher.plist
 
   Logs: /Users/YOUR_USERNAME/Library/Logs/Amber/dist-watcher.log

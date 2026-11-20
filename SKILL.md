@@ -173,7 +173,7 @@ To retry the check without re-entering credentials, run `npm run setup -- --chec
 
 1. From the Amber skill folder: `cd runtime && npm ci`
 2. `cd ../amber-skills/crm && npm ci` if you plan to enable CRM caller memory.
-3. `cd ../..` and copy `references/env.example` to `runtime/.env`, then fill in your values.
+3. `cd ../..` and copy `references/env.example.txt` to `runtime/.env`, then fill in your values.
 4. Set `AMBER_CRM_ENABLED=true` only if you want local caller memory/known-caller greetings.
 5. `cd runtime && npm run build && npm start`
 6. Point your Twilio voice webhook to `https://<your-domain>/twilio/inbound`
@@ -181,7 +181,7 @@ To retry the check without re-entering credentials, run `npm run setup -- --chec
 
 ### Option C: Validation-only (existing setup)
 
-1. Copy `references/env.example` to your own `.env` and replace placeholders.
+1. Copy `references/env.example.txt` to your own `.env` and replace placeholders.
 2. Export required variables (`TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_CALLER_ID`, `OPENAI_API_KEY`, `OPENAI_PROJECT_ID`, `OPENAI_WEBHOOK_SECRET`, `PUBLIC_BASE_URL`).
 3. Run quick setup:
    `scripts/setup_quickstart.sh`
@@ -232,7 +232,7 @@ Read `references/architecture.md`, run `scripts/validate_voice_env.sh` on the ta
 
 - **Runtime bridge:** `runtime/` (full source + README)
 - Architecture and behavior notes: `references/architecture.md`
-- Env template: `references/env.example`
+- Env template: `references/env.example.txt`
 - Quick setup runner: `scripts/setup_quickstart.sh`
 - Env/config validator: `scripts/validate_voice_env.sh`
 

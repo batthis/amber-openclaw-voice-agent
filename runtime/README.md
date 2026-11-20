@@ -41,7 +41,7 @@ If you prefer to configure manually:
 
 ```bash
 npm install
-cp ../references/env.example .env
+cp ../references/env.example.txt .env
 ```
 
 Edit `.env` with your credentials:
