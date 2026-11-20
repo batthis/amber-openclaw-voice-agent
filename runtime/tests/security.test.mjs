@@ -75,7 +75,13 @@ test('dashboard denies cross-site/simple/DNS-rebound requests; same-origin previ
  const call=await fetch(base+'/api/call',{method:'POST',headers:{Origin:base,'Content-Type':'application/json'},body:JSON.stringify({...plan,confirmed:true,approvalToken:'mock-token'})});assert.equal(call.status,200);assert.equal(requests[0].url,'/call/preview');assert.equal(requests[0].body.model,'gpt-realtime-2.1');assert.equal(requests[0].authorization,'Bearer '+fs.readFileSync(path.join(tmp,'token'),'utf8').trim());assert.equal(requests[1].body.approvalToken,'mock-token');assert.equal(requests[1].body.confirmed,true);
  const legacyMini=await fetch(base+'/api/call/preview',{method:'POST',headers:{Origin:base,'Content-Type':'application/json'},body:JSON.stringify({...plan,model:'gpt-realtime-mini'})});
  assert.equal(legacyMini.status,200);assert.equal(requests[2].body.model,'gpt-realtime-2.1-mini');
- const sync=await fetch(base+'/api/sync',{method:'POST',headers:{Origin:base,'Content-Type':'application/json'},body:'{}'});assert.equal(sync.status,200);
+ fs.writeFileSync(path.join(tmp,'rtc_sync_fixture.txt'),'CALLER: Sample for dashboard sync');
+ const sync=()=>fetch(base+'/api/sync',{method:'POST',headers:{Origin:base,'Content-Type':'application/json'},body:'{}'});
+ const syncResults=await Promise.all([sync(),sync()]);
+ for(const result of syncResults){assert.equal(result.status,200);assert.equal((await result.json()).calls,1);}
+ const dashboardCalls=await (await fetch(base+'/data/calls.json')).json();
+ assert.equal(dashboardCalls.length,1);
+ assert.match(dashboardCalls[0].transcript,/Sample for dashboard sync/);
  } finally {await proc.stop();await new Promise(r=>mock.close(r));fs.rmSync(tmp,{recursive:true,force:true});}
 });
 test('MCP first-call confirmation is rejected, preview token is returned and forwarded only on confirmation',async()=>{

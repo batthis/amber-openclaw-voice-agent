@@ -6,6 +6,10 @@
 
 Beyond phone calls, configured MCP clients can query availability and create calendar events through `ical-query`, and independently use optional CRM contact creation, updates, history, and interaction logging. Calendar writes require explicit confirmation. Contact lookup uses an operator-generated local Apple Contacts cache; the sync helper exports contact names/numbers, with optional extended notes, relationships, and addresses only when `AMBER_CONTACTS_EXTENDED=true`. CRM and transcript enrichment remain separately opt-in. Review local cache, database and transcript retention before use.
 
+The live-call CRM router in `runtime/src/skills/router.ts` permits only record actions for the number attached to the call by the bridge. A caller-supplied number cannot override it, and live calls cannot search the CRM. Broader CRM search and edits are available through the local MCP server over standard input and output, under the account that runs it. Grant that client access only to trusted operators.
+
+Twilio carries the call and routing details. OpenAI Realtime processes call audio and receives call context, including CRM greeting hints when enabled. Separately opted-in CRM enrichment sends up to 6,000 characters of the transcript to the OpenAI API and writes extracted fields to the local CRM. If configured, the OpenClaw gateway receives consultation requests with relevant call context and forwards caller messages to the operator’s chosen channel. Apple Contacts export runs locally. Custom mid-call skills execute code the operator installs on the host.
+
 Maintainer documentation includes optional ClawHub publishing and demo-recording upload commands. Those commands are manual release/demo workflows, not actions performed at runtime or during installation.
 
 ## Security upgrade notes
@@ -53,6 +57,13 @@ Amber is not just a standalone voice bot or virtual receptionist. It gives an ag
 - 📝 **AGENT.md** — customize all prompts, greetings, booking flow, and personality in a single editable markdown file (no code changes needed)
 
 ## 🆕 What's New
+
+### v5.5.62 — Credential handling and audit follow-up
+
+- Require owner-only permissions before writing setup credentials.
+- Run dashboard sync with the limited environment it needs, and target only Amber’s bridge in the optional macOS build watcher.
+- Keep extracted CRM fields in the CRM and record only event metadata in enrichment diagnostics.
+- Document the difference between live-call and local operator CRM access and explain which services receive call data.
 
 ### v5.5.61 — GPT Realtime 2.1
 
@@ -178,7 +189,7 @@ cp runtime/scripts/com.jarvis.amber-dist-watcher.plist.example ~/Library/LaunchA
 launchctl load ~/Library/LaunchAgents/com.jarvis.amber-dist-watcher.plist
 ```
 
-The watcher checks every 60 seconds and logs to `/tmp/amber-dist-watcher.log`.
+The watcher checks every 60 seconds and logs to `/tmp/amber-dist-watcher.log`. It targets only `com.jarvis.twilio-bridge`, and it needs no network access or provider credentials.
 
 > **Why this matters:** Skills and the router are loaded fresh at startup. A mismatch between a compiled `dist/skills/` and a hand-edited `handler.js` (or vice versa) will cause silent skill failures that are hard to diagnose. Always restart after any `npm run build`.
 
@@ -302,4 +313,4 @@ Gateway consultations and skill requests use call-scoped session identifiers. Re
 
 ### Optional local authority and persistence
 
-Calendar lookup/create uses the operator-installed `ical-query` helper. Contact sync is an explicit local Apple Contacts export; it can invoke local macOS helpers. CRM reads/writes its opt-in local database. The optional `runtime/scripts/dist-watcher.cjs` maintenance watcher invokes `pgrep`, `ps`, and `launchctl` to restart a separately configured LaunchAgent after build changes; Amber does not install or enable that watcher automatically. These local binaries, environment settings, credential files, contact cache, logs and database are real authority/data accesses, not capabilities constrained by the skill metadata alone. Review source and host permissions before enabling integrations.
+Calendar lookup/create uses the operator-installed `ical-query` helper. Contact sync is an explicit local Apple Contacts export; it can invoke local macOS helpers. CRM reads/writes its opt-in local database. The optional `runtime/scripts/dist-watcher.cjs` maintenance watcher reads the named bridge service from `launchctl`, checks its process start time with `ps`, and restarts that service after build changes. An operator must install and enable the watcher separately. These local binaries, environment settings, credential files, contact cache, logs and database are real authority/data accesses, not capabilities constrained by the skill metadata alone. Review source and host permissions before enabling integrations.

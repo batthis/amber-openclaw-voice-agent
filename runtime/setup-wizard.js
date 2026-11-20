@@ -4,11 +4,12 @@
 
 import { createInterface } from 'node:readline/promises';
 import { stdin, stdout, env } from 'node:process';
-import { chmodSync, existsSync, writeFileSync, readFileSync } from 'node:fs';
+import { existsSync, writeFileSync, readFileSync } from 'node:fs';
 import { access } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { runFirstCallCheck } from './first-call-check.js';
+import { writePrivateConfig } from './write-private-config.js';
 import modelConfig from './realtime-models.cjs';
 
 const { DEFAULT_REALTIME_MODEL, REALTIME_MODELS, normalizeRealtimeModel } = modelConfig;
@@ -426,8 +427,7 @@ ${c.bold}${c.cyan}╔═══════════════════�
   }
 
   lines.push('');
-  writeFileSync(envPath, lines.join('\n'), { mode: 0o600 });
-  try { chmodSync(envPath, 0o600); } catch {}
+  writePrivateConfig(envPath, lines.join('\n'));
   ok(`.env written to ${envPath}`);
 
   let hermesInstall = null;

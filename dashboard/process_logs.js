@@ -760,7 +760,10 @@ async function processLogsWithOptions(options) {
 
 // Run if called directly
 if (require.main === module) {
-    const args = parseArgs(process.argv);
+    const syncFromDashboard = process.argv[2] === '--dashboard-sync' && typeof process.send === 'function';
+    const args = syncFromDashboard
+        ? { logsDir: process.env.LOGS_DIR, outputDir: path.join(__dirname, 'data') }
+        : parseArgs(process.argv);
     if (args.help) {
         console.log('Usage: node process_logs.js [--logs <dir>] [--out <dir>] [--no-sample]');
         console.log('');
@@ -774,6 +777,10 @@ if (require.main === module) {
         process.exit(0);
     }
     processLogsWithOptions(args).then(calls => {
+        if (syncFromDashboard) {
+            process.send({ count: calls.length }, error => process.exit(error ? 1 : 0));
+            return;
+        }
         console.log('Call log processing complete');
         process.exit(0);
     }).catch(err => {

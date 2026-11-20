@@ -2105,11 +2105,18 @@ Rules:
     try {
       extracted = JSON.parse(raw);
     } catch {
-      writeJsonl({ type: 'c2.crm_extract_parse_error', call_id: callId, raw });
+      writeJsonl({ type: 'c2.crm_extract_parse_error', call_id: callId });
       return;
     }
 
-    writeJsonl({ type: 'c2.crm_extract_result', call_id: callId, received_at: new Date().toISOString(), extracted });
+    writeJsonl({
+      type: 'c2.crm_extract_result',
+      call_id: callId,
+      received_at: new Date().toISOString(),
+      has_contact_fields: Boolean(extracted.caller_name || extracted.caller_email || extracted.caller_company),
+      has_context: Boolean(extracted.context_notes),
+      has_summary: Boolean(extracted.call_summary),
+    });
 
     // Build upsert params — only include fields that were actually extracted
     const upsertParams: Record<string, any> = { action: 'upsert_contact', phone: callerPhone };
