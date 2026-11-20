@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { randomBytes } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import twilio from 'twilio';
@@ -9,7 +10,7 @@ const { version } = JSON.parse(await readFile(new URL('../package.json', import.
 const cfg = {
   PUBLIC_BASE_URL: 'https://amber.example',
   TWILIO_AUTH_TOKEN: 'test-twilio-secret',
-  OPENAI_WEBHOOK_SECRET: 'whsec_dGVzdC1vcGVuYWktc2VjcmV0',
+  OPENAI_WEBHOOK_SECRET: `whsec_${randomBytes(32).toString('base64')}`,
 };
 
 function fixture({ localVersion = version, publicInstance = 'bridge-a', acceptUnsignedTwilio = false } = {}) {
