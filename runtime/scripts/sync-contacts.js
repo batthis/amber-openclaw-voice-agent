@@ -24,6 +24,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3';
+import { writePrivateFile } from '../write-private-file.js';
 
 const includeExtendedFields = /^(1|true|yes)$/i.test(process.env.AMBER_CONTACTS_EXTENDED || '');
 
@@ -169,7 +170,7 @@ for (const c of mergeMap.values()) {
 
 // Output path relative to this script (runtime/scripts/ → runtime/contacts-cache.json)
 const outPath = path.join(scriptDir, '..', 'contacts-cache.json');
-fs.writeFileSync(outPath, JSON.stringify({
+writePrivateFile(outPath, JSON.stringify({
   exportedAt: new Date().toISOString(),
   count: contacts.length,
   contacts,
@@ -177,4 +178,4 @@ fs.writeFileSync(outPath, JSON.stringify({
 
 console.log(`✓ Exported ${contacts.length} contacts → contacts-cache.json`);
 console.log(`  Fields: ${includeExtendedFields ? 'extended local-only contact fields' : 'names, phone numbers, and phone labels only'}`);
-console.log('  This file is local-only and excluded from version control.');
+console.log('  This file is owner-only, local, and excluded from version control.');

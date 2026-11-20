@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { copyFile, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { chmod, copyFile, mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -20,6 +20,8 @@ test('Apple Contacts sync works with a basic schema and exports extra fields onl
   await symlink(new URL('../node_modules/', import.meta.url), join(fixture, 'node_modules'), 'dir');
   const script = join(scripts, 'sync-contacts.js');
   await copyFile(new URL('../scripts/sync-contacts.js', import.meta.url), script);
+  await copyFile(new URL('../write-private-file.js', import.meta.url), join(fixture, 'write-private-file.js'));
+  const cachePath = join(fixture, 'contacts-cache.json');
 
   const db = new Database(join(addressBook, 'AddressBook-v22.abcddb'));
   try {
@@ -34,7 +36,8 @@ test('Apple Contacts sync works with a basic schema and exports extra fields onl
         env: { ...process.env, HOME: fixture, AMBER_CONTACTS_EXTENDED: String(extended) },
       });
       assert.equal(stderr, '');
-      const cache = JSON.parse(await readFile(join(fixture, 'contacts-cache.json'), 'utf8'));
+      assert.equal((await stat(cachePath)).mode & 0o777, 0o600);
+      const cache = JSON.parse(await readFile(cachePath, 'utf8'));
       assert.equal(cache.count, 1);
       return cache.contacts[0];
     }
@@ -59,6 +62,7 @@ test('Apple Contacts sync works with a basic schema and exports extra fields onl
       INSERT INTO ZABCDRELATEDNAME VALUES (1, 'Jamie', 'friend');
       INSERT INTO ZABCDPOSTALADDRESS VALUES (1, '100 Example Ave', 'Example City', '', '', '', 'work');
     `);
+    await chmod(cachePath, 0o644);
     const extended = await sync(true);
     assert.equal(extended.nickname, 'Al');
     assert.equal(extended.organization, 'Example Shop');

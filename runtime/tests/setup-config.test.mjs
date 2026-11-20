@@ -3,18 +3,18 @@ import { chmodSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync } f
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { writePrivateConfig } from '../write-private-config.js';
+import { writePrivateFile } from '../write-private-file.js';
 
 test('setup keeps new and existing configuration owner-only, including symlink targets', (t) => {
   const dir = mkdtempSync(join(tmpdir(), 'amber-setup-config-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const configPath = join(dir, 'settings');
   const envPath = join(dir, '.env');
-  writePrivateConfig(configPath, 'MODE=old-value\n');
+  writePrivateFile(configPath, 'MODE=old-value\n');
   assert.equal(statSync(configPath).mode & 0o777, 0o600);
   chmodSync(configPath, 0o644);
   symlinkSync(configPath, envPath);
-  writePrivateConfig(envPath, 'MODE=new\n');
+  writePrivateFile(envPath, 'MODE=new\n');
   assert.equal(statSync(configPath).mode & 0o777, 0o600);
   assert.equal(readFileSync(configPath, 'utf8'), 'MODE=new\n');
 });

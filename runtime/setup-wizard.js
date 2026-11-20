@@ -9,7 +9,7 @@ import { access } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { runFirstCallCheck } from './first-call-check.js';
-import { writePrivateConfig } from './write-private-config.js';
+import { writePrivateFile } from './write-private-file.js';
 import modelConfig from './realtime-models.cjs';
 
 const { DEFAULT_REALTIME_MODEL, REALTIME_MODELS, normalizeRealtimeModel } = modelConfig;
@@ -427,7 +427,7 @@ ${c.bold}${c.cyan}╔═══════════════════�
   }
 
   lines.push('');
-  writePrivateConfig(envPath, lines.join('\n'));
+  writePrivateFile(envPath, lines.join('\n'));
   ok(`.env written to ${envPath}`);
 
   let hermesInstall = null;
