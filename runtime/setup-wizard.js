@@ -307,6 +307,7 @@ ${c.bold}${c.cyan}╔═══════════════════�
   // ── CRM / Caller Memory ───────────────────────────────────────────
   head('CRM Caller Memory (optional)');
   info('CRM lets Amber recognize known callers by phone number and keep local interaction history.');
+  warn('Twilio and OpenAI Realtime process call audio. Local call transcripts and summaries can contain personal information.');
   warn('CRM stores caller/contact records locally. Enable it only with appropriate caller notice, consent, retention, and review practices.');
   cfg.AMBER_CRM_ENABLED = await yesNo('Enable local CRM caller memory?', false) ? 'true' : 'false';
   if (cfg.AMBER_CRM_ENABLED === 'true') {

@@ -1,7 +1,7 @@
 ---
 name: amber-voice-assistant
 title: "Amber — Give Your Agent Real Phone Capabilities"
-description: "Give your agent a phone number. Amber answers calls, places confirmed outbound calls, completes phone tasks, logs transcripts, and exposes MCP tools."
+description: "Inbound calls, confirmed outbound calls, transcripts, calendar booking, optional CRM, and opt-in Apple Contacts lookup through MCP."
 homepage: https://github.com/batthis/amber-openclaw-voice-agent
 metadata: {"openclaw":{"emoji":"☎️","requires":{"env":[],"optionalEnv":["AMBER_ENABLE_OUTBOUND_CALLS","AMBER_REALTIME_MODEL","AMBER_REALTIME_VAD_THRESHOLD","AMBER_REALTIME_VAD_PREFIX_PADDING_MS","AMBER_REALTIME_VAD_SILENCE_DURATION_MS","AMBER_CRM_ENABLED","AMBER_CRM_TRANSCRIPT_ENRICHMENT","OPENCLAW_GATEWAY_URL","TWILIO_WEBHOOK_STRICT","VOICE_PROVIDER","VOICE_WEBHOOK_SECRET","ASSISTANT_NAME","OPERATOR_NAME","AMBER_CRM_DB_PATH","AGENT_MD_PATH","DEFAULT_CALENDAR","AMBER_CONTACTS_EXTENDED"],"anyBins":["node","ical-query"]},"permissions":{"network":true,"env":true,"webhooks":true,"localFiles":["runtime/logs/","runtime/contacts-cache.json","~/.config/amber/crm.sqlite"],"localBinaries":["node","ical-query"],"mcpTools":["make_call","get_call_status","get_call_history","crm","contacts_lookup","calendar_query","start_screening","stop_screening","bridge_health"],"externalServices":["Twilio","OpenAI Realtime/API","optional OpenClaw Gateway"]},"install":[{"id":"runtime","kind":"node","cwd":"runtime","label":"Install Amber runtime (cd runtime && npm ci && npm run build)"},{"id":"crm-skill","kind":"node","cwd":"amber-skills/crm","label":"Install optional CRM skill dependencies (cd amber-skills/crm && npm ci)"}]}}
 ---
@@ -45,6 +45,8 @@ Maintainer documentation includes optional ClawHub publishing and demo-recording
 - **Usage budget** — voice-provider number/call charges and OpenAI API usage are separate; installing the skill does not include those services. The dashboard shows estimated call costs.
 
 Amber is a sensitive communications system. It can process call audio/transcripts through configured voice and AI providers, store local call logs, maintain a local CRM, read/write the operator calendar, expose local MCP tools, and optionally use an Apple Contacts export for name-to-number resolution. Operators should configure caller notice/consent, retention/deletion practices, and least-privilege provider credentials before production use.
+
+Twilio handles phone connections and OpenAI Realtime processes live audio and transcripts. When the OpenClaw gateway integration is configured, it receives call context needed for the requested task. Restrict access to local transcripts and structured summaries and set a retention policy appropriate for your calls.
 
 Privacy defaults: local CRM lookup/logging is disabled unless `AMBER_CRM_ENABLED=true`, and post-call transcript enrichment is disabled unless `AMBER_CRM_TRANSCRIPT_ENRICHMENT=true`. Enable those only after setting caller notice/consent and retention/deletion practices.
 

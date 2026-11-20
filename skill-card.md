@@ -1,6 +1,6 @@
 ## Description:
 
-Give Hermes Agent real phone capabilities through Amber's Twilio/OpenAI voice bridge and MCP tools.
+Inbound calls, confirmed outbound calls, transcripts, calendar booking, optional CRM, and opt-in Apple Contacts lookup through MCP.
 
 This skill is ready for commercial/non-commercial use.
 

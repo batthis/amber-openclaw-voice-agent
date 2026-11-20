@@ -14,7 +14,7 @@ import type { HandleSkillCallDeps } from './skills/index.js';
 import { BRIDGE_CREDENTIAL as DEFAULT_BRIDGE_CREDENTIAL, CRM_ENABLED, CRM_TRANSCRIPT_ENRICHMENT_ENABLED, DEFAULT_OPENAI_VOICE, GATEWAY_BASE_URL, GATEWAY_CREDENTIAL, IS_PRODUCTION_RUNTIME, IS_TEST_RUNTIME, OUTBOUND_CALLS_ENABLED, PROVIDER_WEBHOOK_STRICT, REALTIME_INTERRUPT_RESPONSE, REALTIME_MODEL, REALTIME_NOISE_REDUCTION, REALTIME_VAD_PREFIX_PADDING_MS, REALTIME_VAD_SILENCE_DURATION_MS, REALTIME_VAD_THRESHOLD, RUNTIME_PORT, getPersonalizationConfig, getTelephonyRuntimeConfig, getTelnyxRuntimeConfig, getVoiceProviderName, requireRuntimeEnv } from './config.js';
 
 import { CallApprovals, verifyOpenAIWebhook, crmGreetingData } from './security.js';
-import { consultationData, callSessionKey } from './trust-boundaries.js';
+import { consultationData, callSessionKey, realtimeEventForLog } from './trust-boundaries.js';
 
 const callApprovals = new CallApprovals();
 const bridgeInstance = crypto.randomUUID();
@@ -758,8 +758,8 @@ const callAccept = {
     }
 
     ensureDirSync(logsDir());
-    const jsonlStream = fs.createWriteStream(logsJsonlPath(callId), { flags: 'a' });
-    const transcriptStream = fs.createWriteStream(logsTranscriptPath(callId), { flags: 'a' });
+    const jsonlStream = fs.createWriteStream(logsJsonlPath(callId), { flags: 'a', mode: 0o600 });
+    const transcriptStream = fs.createWriteStream(logsTranscriptPath(callId), { flags: 'a', mode: 0o600 });
 
     const writeJsonl = (obj: unknown) => {
       jsonlStream.write(`${JSON.stringify(obj)}\n`);
@@ -953,6 +953,7 @@ const callAccept = {
     // Accumulate function call arguments (they may come in deltas)
     const pendingFunctionCalls = new Map<string, { name: string; args: string }>();
 
+    let callSummary: Record<string, unknown> | null = null;
     ws.on('message', (data, isBinary) => {
       const receivedAt = new Date().toISOString();
       const rawText =
@@ -965,10 +966,18 @@ const callAccept = {
       try {
         parsed = JSON.parse(rawText);
       } catch {
-        parsed = { type: 'unparsed', raw: rawText };
+        parsed = { type: 'unparsed' };
       }
 
-      writeJsonl({ received_at: receivedAt, event: parsed });
+      writeJsonl({ received_at: receivedAt, event: realtimeEventForLog(parsed) });
+
+      const eventType = String(parsed?.type ?? '');
+      const summaryText = eventType === 'response.output_text.done' ? parsed.text
+        : eventType === 'response.audio_transcript.done' ? parsed.transcript : null;
+      if (typeof summaryText === 'string') {
+        const summary = sanitizeSummaryJson(parseSummaryJsonFromTranscript(summaryText));
+        if (summary) callSummary = summary;
+      }
 
       for (const t of extractTranscriptStrings(parsed)) {
         // Strip SUMMARY_JSON lines before writing to transcript log.
@@ -981,7 +990,6 @@ const callAccept = {
       }
 
       // Phase C2: Handle function call events
-      const eventType = String(parsed?.type ?? '');
 
       // Track function call argument deltas
       if (eventType === 'response.function_call_arguments.delta') {
@@ -1076,7 +1084,13 @@ const callAccept = {
         reason: reason.toString()
       });
       await Promise.all([endStream(jsonlStream), endStream(transcriptStream)]);
-      await finalizeSummaryFromTranscript(callId);
+      if (callSummary) {
+        try {
+          await fs.promises.writeFile(logsSummaryPath(callId), JSON.stringify(callSummary), { mode: 0o600 });
+        } catch {
+          console.error('Could not save the structured call summary');
+        }
+      }
 
       // Opt-in CRM auto-log. Enable with AMBER_CRM_ENABLED=true after caller
       // notice/consent and retention practices are configured.
@@ -2133,26 +2147,6 @@ Rules:
     writeJsonl({ type: 'c2.crm_extract_done', call_id: callId, received_at: new Date().toISOString(), has_context: !!extracted.context_notes });
   } catch (e) {
     writeJsonl({ type: 'c2.crm_extract_error', call_id: callId, received_at: new Date().toISOString(), error: String(e) });
-  }
-}
-
-async function finalizeSummaryFromTranscript(callId: string): Promise<void> {
-  try {
-    const transcriptPath = logsTranscriptPath(callId);
-    const summaryPath = logsSummaryPath(callId);
-    if (!fs.existsSync(transcriptPath)) return;
-
-    const text = await fs.promises.readFile(transcriptPath, 'utf8');
-    const raw = parseSummaryJsonFromTranscript(text);
-    if (!raw) return;
-
-    // Sanitize at write, not just at display — defense in depth.
-    const summary = sanitizeSummaryJson(raw);
-    if (!summary) return;
-
-    await fs.promises.writeFile(summaryPath, `${JSON.stringify(summary, null, 2)}\n`, 'utf8');
-  } catch (e) {
-    console.error('finalizeSummaryFromTranscript error', callId, e);
   }
 }
 

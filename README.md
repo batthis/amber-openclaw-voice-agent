@@ -54,6 +54,11 @@ Amber is not just a standalone voice bot or virtual receptionist. It gives an ag
 
 ## 🆕 What's New
 
+### v5.5.60 — Realtime logs and capability disclosure
+
+- Keep event types and numeric usage counters in Realtime diagnostics. Store the structured call summary separately from the transcript.
+- Describe calendar booking, optional CRM, and opt-in Apple Contacts lookup in the ClawHub summary.
+
 ### v5.5.59 — Call-log privacy and CRM note integrity
 
 - Store only call routing fields required by the dashboard. Omit raw SIP headers and private calendar diagnostics.

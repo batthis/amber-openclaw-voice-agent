@@ -43,3 +43,27 @@ test('actual bridge gateway transcript stays user data with isolated debug sessi
  const fallback=await fetch(`http://127.0.0.1:${port}/openclaw/ask`,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer test-bridge'},body:JSON.stringify({question:'Force fallback',transcript:attack})});assert.equal(fallback.status,200);assert.equal((await fallback.json()).answer,'Available at two');assert.equal(requests.length,4);assert.equal(requests[3].model,'gpt-4o');assert(!requests[3].messages[0].content.includes(attack));assert.equal(JSON.parse(requests[3].messages[1].content).transcript,attack);
  }finally{child.kill();await once(child,'exit');await new Promise(r=>mock.close(r));fs.rmSync(tmp,{recursive:true,force:true});}
 });
+
+test('Realtime diagnostic events keep usage counters without raw caller or tool content', async () => {
+  const { realtimeEventForLog } = await import('../dist/trust-boundaries.js');
+  const privateData = 'SUMMARY_JSON: {"callback":"+12025550142","message":"Private caller details"}';
+  const response = realtimeEventForLog({
+    type: 'response.done',
+    response: {
+      output: [{ content: [{ text: privateData }] }],
+      usage: { total_tokens: 8, input_tokens: 5, output_tokens: 3,
+        input_token_details: { audio_tokens: 5, private: privateData },
+        output_token_details: { text_tokens: 3 } },
+    },
+    raw: privateData,
+  });
+  assert.deepEqual(response, {
+    type: 'response.done',
+    response: { usage: { total_tokens: 8, input_tokens: 5, output_tokens: 3,
+      input_token_details: { audio_tokens: 5 }, output_token_details: { text_tokens: 3 } } },
+  });
+  assert.deepEqual(realtimeEventForLog({ type: 'response.output_text.done', text: privateData }),
+    { type: 'response.output_text.done' });
+  assert.deepEqual(realtimeEventForLog({ type: 'response.function_call_arguments.done', arguments: privateData }),
+    { type: 'response.function_call_arguments.done' });
+});

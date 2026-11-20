@@ -22,7 +22,7 @@ For documentation consistency (but doesn't affect ClawHub display).
 
 ### Description (frontmatter in SKILL.md)
 ```
-"The most complete phone skill for OpenClaw. Production-ready, low-latency AI calls — inbound & outbound, multilingual, live dashboard, brain-in-the-loop."
+"Inbound calls, confirmed outbound calls, transcripts, calendar booking, optional CRM, and opt-in Apple Contacts lookup through MCP."
 ```
 
 Must be exactly 155 characters or less.
