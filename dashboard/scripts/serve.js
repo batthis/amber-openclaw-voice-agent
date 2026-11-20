@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const { URL } = require('url');
 const { processLogsWithOptions } = require('../process_logs.js');
+const { DEFAULT_REALTIME_MODEL, REALTIME_MODELS, normalizeRealtimeModel } = require('../../runtime/realtime-models.cjs');
 
 function parseArgs(argv) {
   const args = { port: 8787, host: '127.0.0.1' };
@@ -82,8 +83,6 @@ function sendJson(res, status, payload) {
   res.end(JSON.stringify(payload));
 }
 
-const ALLOWED_REALTIME_MODELS = new Set(['gpt-realtime', 'gpt-realtime-mini']);
-
 const server = http.createServer((req, res) => {
   const origin = req.headers.origin;
   const allowedHosts = new Set([`127.0.0.1:${args.port}`, `localhost:${args.port}`, `[::1]:${args.port}`]);
@@ -122,14 +121,14 @@ const server = http.createServer((req, res) => {
         const bridgeToken = String(body.bridgeToken || (bridgeUrl === configuredBridgeUrl ? resolveBridgeCredential(path.join(root, '..', 'runtime')) : ''));
         const to = String(body.to || '').trim();
         const objective = String(body.objective || '').trim();
-        const model = String(body.model || 'gpt-realtime').trim();
+        const model = normalizeRealtimeModel(String(body.model ?? '')) || DEFAULT_REALTIME_MODEL;
 
         if (!isLoopbackBridgeUrl(bridgeUrl)) {
           sendJson(res, 400, { success: false, error: 'Bridge URL must be localhost/loopback.' });
           return;
         }
-        if (!ALLOWED_REALTIME_MODELS.has(model)) {
-          sendJson(res, 400, { success: false, error: 'Invalid model. Choose gpt-realtime or gpt-realtime-mini.' });
+        if (!REALTIME_MODELS.includes(model)) {
+          sendJson(res, 400, { success: false, error: `Invalid model. Choose ${REALTIME_MODELS.join(' or ')}.` });
           return;
         }
         if (!/^\+[1-9]\d{6,14}$/.test(to)) {

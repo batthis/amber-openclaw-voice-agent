@@ -54,6 +54,11 @@ Amber is not just a standalone voice bot or virtual receptionist. It gives an ag
 
 ## 🆕 What's New
 
+### v5.5.61 — GPT Realtime 2.1
+
+- Use GPT Realtime 2.1 by default. Select 2.1 Mini in the setup wizard, runtime settings, or dashboard.
+- Map legacy Realtime model names to the corresponding 2.1 models in saved settings and call requests.
+
 ### v5.5.60 — Realtime logs and capability disclosure
 
 - Keep event types and numeric usage counters in Realtime diagnostics. Store the structured call summary separately from the transcript.

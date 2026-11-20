@@ -134,6 +134,10 @@ Use the authenticated MCP tools `stop_screening` and `start_screening`. When pau
 
 Amber uses an opaque, call-specific reference issued by the signed Twilio inbound webhook to match the Realtime call to its caller record. Custom SIP flows without that reference can still use generic screening. They do not automatically look up a CRM record or attach the call to one.
 
+## Realtime model selection
+
+Amber defaults to `gpt-realtime-2.1`. Set `AMBER_REALTIME_MODEL=gpt-realtime-2.1-mini` for the mini model, or choose a model per outbound test call in the dashboard. Existing settings and per-call requests using the original `gpt-realtime` or `gpt-realtime-mini` names automatically use the corresponding 2.1 model.
+
 ## Environment Variables Reference
 
 ### Required
@@ -169,7 +173,7 @@ When configured, the assistant can delegate complex queries (calendar lookups, c
 | `ORG_NAME` | Organization name | (empty) |
 | `DEFAULT_CALENDAR` | Default calendar for bookings | (empty) |
 | `OPENAI_VOICE` | OpenAI TTS voice (alloy, echo, fable, onyx, nova, shimmer) | `alloy` |
-| `AMBER_REALTIME_MODEL` | Default Realtime model for calls without a per-call override (`gpt-realtime` or `gpt-realtime-mini`) | `gpt-realtime` |
+| `AMBER_REALTIME_MODEL` | Default Realtime model for calls without a per-call override (`gpt-realtime-2.1` or `gpt-realtime-2.1-mini`) | `gpt-realtime-2.1` |
 | `AMBER_REALTIME_VAD_THRESHOLD` | Realtime server VAD speech sensitivity. Lower is more sensitive to quiet speech. | `0.5` |
 | `AMBER_REALTIME_VAD_PREFIX_PADDING_MS` | Audio padding kept before detected speech starts. | `500` |
 | `AMBER_REALTIME_VAD_SILENCE_DURATION_MS` | Silence length used to commit a caller turn. | `650` |
@@ -199,7 +203,7 @@ When configured, the assistant can delegate complex queries (calendar lookups, c
 
 - **POST /call/preview** - Validate destination, objective, optional call plan, and model; return a five-minute single-use `approvalToken`.
 - **POST /call/outbound** - After explicit operator approval, submit the exact previewed plan with `confirmed=true` and its `approvalToken`. A changed plan, missing/expired token or replay is rejected before dialing. Direct browser calls are denied; use the same-origin dashboard proxy. Tokens enforce sequencing, not proof of human approval.
-  - Body: `{ "to": "+15555551234", "objective": "...", "callPlan": {...}, "model": "gpt-realtime-mini" }`
+  - Body: `{ "to": "+15555551234", "objective": "...", "callPlan": {...}, "model": "gpt-realtime-2.1-mini" }`
   - `model` is optional; when omitted, Amber uses `AMBER_REALTIME_MODEL`.
 
 ### OpenAI Webhook

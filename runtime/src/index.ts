@@ -11,7 +11,7 @@ import { createProvider } from './providers/index.js';
 import type { IVoiceProvider } from './providers/index.js';
 import { loadSkills, registerSkills, isSkillFunction, getSkillTools, handleSkillCall, callSkillDirectly } from './skills/index.js';
 import type { HandleSkillCallDeps } from './skills/index.js';
-import { BRIDGE_CREDENTIAL as DEFAULT_BRIDGE_CREDENTIAL, CRM_ENABLED, CRM_TRANSCRIPT_ENRICHMENT_ENABLED, DEFAULT_OPENAI_VOICE, GATEWAY_BASE_URL, GATEWAY_CREDENTIAL, IS_PRODUCTION_RUNTIME, IS_TEST_RUNTIME, OUTBOUND_CALLS_ENABLED, PROVIDER_WEBHOOK_STRICT, REALTIME_INTERRUPT_RESPONSE, REALTIME_MODEL, REALTIME_NOISE_REDUCTION, REALTIME_VAD_PREFIX_PADDING_MS, REALTIME_VAD_SILENCE_DURATION_MS, REALTIME_VAD_THRESHOLD, RUNTIME_PORT, getPersonalizationConfig, getTelephonyRuntimeConfig, getTelnyxRuntimeConfig, getVoiceProviderName, requireRuntimeEnv } from './config.js';
+import { BRIDGE_CREDENTIAL as DEFAULT_BRIDGE_CREDENTIAL, CRM_ENABLED, CRM_TRANSCRIPT_ENRICHMENT_ENABLED, DEFAULT_OPENAI_VOICE, GATEWAY_BASE_URL, GATEWAY_CREDENTIAL, IS_PRODUCTION_RUNTIME, IS_TEST_RUNTIME, OUTBOUND_CALLS_ENABLED, PROVIDER_WEBHOOK_STRICT, REALTIME_INTERRUPT_RESPONSE, REALTIME_MODEL, REALTIME_MODELS, REALTIME_NOISE_REDUCTION, REALTIME_VAD_PREFIX_PADDING_MS, REALTIME_VAD_SILENCE_DURATION_MS, REALTIME_VAD_THRESHOLD, RUNTIME_PORT, getPersonalizationConfig, getTelephonyRuntimeConfig, getTelnyxRuntimeConfig, getVoiceProviderName, normalizeRealtimeModel, requireRuntimeEnv } from './config.js';
 
 import { CallApprovals, verifyOpenAIWebhook, crmGreetingData } from './security.js';
 import { consultationData, callSessionKey, realtimeEventForLog } from './trust-boundaries.js';
@@ -93,7 +93,6 @@ const OPENAI_PROJECT_ID = requireRuntimeEnv('OPENAI_PROJECT_ID');
 const OPENAI_WEBHOOK_SECRET = requireRuntimeEnv('OPENAI_WEBHOOK_SECRET');
 const OPENAI_VOICE = DEFAULT_OPENAI_VOICE;
 const OPENAI_REALTIME_MODEL = REALTIME_MODEL;
-const ALLOWED_OUTBOUND_REALTIME_MODELS = new Set(['gpt-realtime', 'gpt-realtime-mini']);
 
 // OpenClaw gateway for assistant brain-in-loop (Phase C2)
 const OPENCLAW_GATEWAY_URL = GATEWAY_BASE_URL;
@@ -561,9 +560,9 @@ app.post(['/call/outbound', '/call/preview'], requireAuth, async (req: Request, 
 
     const objective = String(req.body?.objective ?? req.body?.intent ?? '').trim();
     const requestedModel = String(req.body?.model ?? '').trim();
-    const model = requestedModel || OPENAI_REALTIME_MODEL;
-    if (!ALLOWED_OUTBOUND_REALTIME_MODELS.has(model)) {
-      return res.status(400).json({ error: 'Invalid `model`. Expected gpt-realtime or gpt-realtime-mini' });
+    const model = normalizeRealtimeModel(requestedModel) || OPENAI_REALTIME_MODEL;
+    if (!REALTIME_MODELS.includes(model)) {
+      return res.status(400).json({ error: `Invalid model. Choose ${REALTIME_MODELS.join(' or ')}.` });
     }
     const callPlan: CallPlan | undefined = req.body?.callPlan && typeof req.body.callPlan === 'object'
       ? req.body.callPlan as CallPlan
@@ -1783,8 +1782,8 @@ function getOutboundModelForKey(key: string, nowMs: number): string | undefined 
   for (const [k, info] of outboundIntentByKey.entries()) {
     if (nowMs - info.createdAtMs > OUTBOUND_INTENT_RETENTION_MS) outboundIntentByKey.delete(k);
   }
-  const model = outboundIntentByKey.get(key)?.model;
-  return model && ALLOWED_OUTBOUND_REALTIME_MODELS.has(model) ? model : undefined;
+  const model = normalizeRealtimeModel(outboundIntentByKey.get(key)?.model ?? '');
+  return REALTIME_MODELS.includes(model) ? model : undefined;
 }
 
 function getOutboundObjectiveForKey(key: string, nowMs: number): string | undefined {

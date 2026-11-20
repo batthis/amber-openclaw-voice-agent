@@ -128,7 +128,7 @@ cd dashboard && node scripts/serve.js   # → http://localhost:8787
 
 - **⬇ Sync button** (green) — immediately pulls new calls from `runtime/logs/` and refreshes the dashboard. Use this right after a call ends rather than waiting for the background watcher.
 - **↻ Refresh button** (blue) — reloads existing data from disk without re-processing logs.
-- **One-touch test calls** — when opened through `node scripts/serve.js`, the dashboard can call a test number through the local Amber bridge and choose `gpt-realtime` or `gpt-realtime-mini` per call.
+- **One-touch test calls** — when opened through `node scripts/serve.js`, the dashboard can call a test number through the local Amber bridge and choose `gpt-realtime-2.1` or `gpt-realtime-2.1-mini` per call.
 - **Cost visibility** — estimates telephony and Realtime token cost from call duration and saved usage metadata; rates are editable in the dashboard.
 - Background watcher (`node scripts/watch.js`) auto-syncs every 30 seconds when running.
 

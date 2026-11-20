@@ -9,6 +9,9 @@ import { access } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { runFirstCallCheck } from './first-call-check.js';
+import modelConfig from './realtime-models.cjs';
+
+const { DEFAULT_REALTIME_MODEL, REALTIME_MODELS, normalizeRealtimeModel } = modelConfig;
 
 // ── Colours ──────────────────────────────────────────────────────────
 const c = {
@@ -57,7 +60,6 @@ const spinner = (label) => {
 // ── Validators ───────────────────────────────────────────────────────
 const isE164 = (v) => /^\+[1-9]\d{6,14}$/.test(v);
 const VOICES = ['alloy','echo','fable','onyx','nova','shimmer'];
-const REALTIME_MODELS = ['gpt-realtime','gpt-realtime-mini'];
 
 async function validateTwilio(sid, token) {
   const s = spinner('Validating Twilio credentials…');
@@ -261,7 +263,7 @@ ${c.bold}${c.cyan}╔═══════════════════�
   }
 
   while (true) {
-    cfg.AMBER_REALTIME_MODEL = (await ask('Default realtime model', 'gpt-realtime')).toLowerCase();
+    cfg.AMBER_REALTIME_MODEL = normalizeRealtimeModel((await ask('Default realtime model', DEFAULT_REALTIME_MODEL)).toLowerCase());
     if (REALTIME_MODELS.includes(cfg.AMBER_REALTIME_MODEL)) {
       ok(`Default realtime model: ${cfg.AMBER_REALTIME_MODEL}`);
       break;
