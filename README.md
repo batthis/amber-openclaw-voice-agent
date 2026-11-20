@@ -54,6 +54,10 @@ Amber is not just a standalone voice bot or virtual receptionist. It gives an ag
 
 ## 🆕 What's New
 
+### v5.5.56 — Webhook test fixture
+
+- Generate the synthetic webhook signing key at test time.
+
 ### v5.5.55 — First-call setup check
 
 - Check the active OpenClaw skill, bridge version, public tunnel, and Twilio and OpenAI webhook signatures from the setup wizard.
