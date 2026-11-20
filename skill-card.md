@@ -44,7 +44,6 @@ Mitigation: Update flagged dependencies before production deployment and review 
 - [Publisher profile](https://clawhub.ai/user/batthis)
 - [OpenClaw](https://openclaw.ai)
 - [Architecture notes](references/architecture.md)
-- [Release checklist](references/release-checklist.md)
 
 ## Skill Output:
 

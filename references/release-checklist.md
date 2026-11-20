@@ -1,4 +1,4 @@
-# V1 Release Checklist (Public)
+# Maintainer release checklist
 
 ## 1) Safety + policy
 - [ ] Outbound call policy is explicit (requires human approval unless user config says otherwise).
@@ -30,3 +30,8 @@
 - [ ] Verify listing page renders correctly on ClawHub.
 - [ ] Test install from CLI on a clean workspace.
 - [ ] Open a tracking issue list for V1->V2 fixes.
+
+
+## Setup demo recording
+
+Record the mock setup wizard with synthetic credentials. Inspect the entire recording before publishing it. Check for API keys, tokens, phone numbers, local paths, terminal history, and other personal information.

@@ -514,21 +514,9 @@ app.post('/twilio/status', validateProviderWebhook, (req: Request, res: Response
     console.log('TWILIO_STATUS', {
       CallSid: b?.CallSid,
       CallStatus: b?.CallStatus,
-      Timestamp: b?.Timestamp,
-      From: b?.From,
-      To: b?.To,
       Direction: b?.Direction,
-      ApiVersion: b?.ApiVersion,
-      AccountSid: b?.AccountSid,
-      // Common debug fields
-      Caller: b?.Caller,
-      Called: b?.Called,
-      CallDuration: b?.CallDuration,
-      // These are sometimes included for <Dial><Sip> failures
       SipResponseCode: b?.SipResponseCode,
-      SipCallId: b?.SipCallId,
       DialCallStatus: b?.DialCallStatus,
-      DialCallSid: b?.DialCallSid,
     });
   } catch (e) {
     console.error('TWILIO_STATUS parse error', e);
@@ -691,16 +679,6 @@ app.post('/openai/webhook', async (req: Request, res: Response) => {
 
     const callId: string | undefined = event?.data?.call_id;
 
-    // Debug: persist raw incoming event so we can see what OpenAI provides (SIP headers/metadata)
-    try {
-      ensureDirSync(logsDir());
-      const incomingEventPath = path.join(logsDir(), 'incoming_' + Date.now() + '.realtime.call.incoming.json');
-      fs.writeFileSync(incomingEventPath, JSON.stringify(event, null, 2));
-      console.log('WROTE_INCOMING_EVENT', incomingEventPath);
-    } catch (e) {
-      console.error('Failed to write incoming event', e);
-    }
-
     if (!callId) {
       return res.status(400).send('Missing call_id');
     }
@@ -722,6 +700,23 @@ app.post('/openai/webhook', async (req: Request, res: Response) => {
 
     const outboundIntent = bridgeId ? outboundIntentByKey.get(bridgeId) : undefined;
     if (!outboundIntent && !screeningEnabled) return res.sendStatus(200);
+
+    const twilioSid = inbound?.callSid ?? (outboundIntent ? extractTwilioCallSidFromWebhook(event) : undefined);
+    // The dashboard needs routing and call IDs. Keep those fields instead of raw SIP headers.
+    const callRouting = {
+      direction: outboundIntent ? 'outbound' : 'inbound',
+      from: outboundIntent ? VOICE_CALLER_ID : inbound?.from ?? null,
+      to: outboundIntent ? outboundIntent.to ?? null : VOICE_CALLER_ID,
+      twilioCallSid: twilioSid && /^CA[a-f0-9]{32}$/i.test(twilioSid) ? twilioSid : null,
+      bridgeId: outboundIntent ? bridgeId ?? null : null,
+    };
+    try {
+      ensureDirSync(logsDir());
+      const incomingEventPath = path.join(logsDir(), `incoming_${nowMs}_${safeCallId(callId)}.realtime.call.incoming.json`);
+      fs.writeFileSync(incomingEventPath, JSON.stringify({ data: { call_id: callId, callRouting } }), { mode: 0o600 });
+    } catch {
+      console.error('Could not save call routing metadata');
+    }
 
     const instructions = outboundObjective
       ? buildOutboundCallInstructions({ objective: outboundObjective, callPlan: outboundCallPlan })
@@ -771,15 +766,13 @@ const callAccept = {
     };
 
     // Debug: log what we think this call is (outbound objective vs inbound screening)
-    const twilioSidForDebug = inbound?.callSid ?? (outboundObjective ? extractTwilioCallSidFromWebhook(event) : undefined);
     writeJsonl({
       type: 'call.intent',
       received_at: new Date().toISOString(),
-      twilio_call_sid: twilioSidForDebug ?? null,
+      twilio_call_sid: callRouting.twilioCallSid,
       outbound_objective: outboundObjective ?? null,
       realtime_model: outboundModel || OPENAI_REALTIME_MODEL,
       selected_mode: outboundObjective ? 'outbound' : 'inbound',
-      inbound_from: inbound?.from ?? null,
       inbound_style: style
     });
 
@@ -895,7 +888,7 @@ const callAccept = {
 
             if (!contact) { sendGreeting(); return; } // new caller
 
-            writeJsonl({ type: 'c2.crm_context_injected', call_id: callId, received_at: new Date().toISOString(), contact_name: contact.name ?? null });
+            writeJsonl({ type: 'c2.crm_context_injected', call_id: callId, received_at: new Date().toISOString() });
             sendGreeting(contact.name ? { name: contact.name, context_notes: contact.context_notes ?? undefined } : undefined);
           })
           .catch((e) => {
@@ -1119,7 +1112,7 @@ const callAccept = {
             details: { direction, call_id: callId, auto_logged: true },
           }, crmApiDeps);
 
-          writeJsonl({ type: 'c2.crm_auto_logged', call_id: callId, received_at: new Date().toISOString(), phone: callerPhone });
+          writeJsonl({ type: 'c2.crm_auto_logged', call_id: callId, received_at: new Date().toISOString() });
 
           if (CRM_TRANSCRIPT_ENRICHMENT_ENABLED) {
             // Pass 2: opt-in LLM extraction enriches name, context_notes, and summary from full transcript.
@@ -2137,7 +2130,7 @@ Rules:
       }, crmApiDeps);
     }
 
-    writeJsonl({ type: 'c2.crm_extract_done', call_id: callId, received_at: new Date().toISOString(), name: extracted.caller_name, has_context: !!extracted.context_notes });
+    writeJsonl({ type: 'c2.crm_extract_done', call_id: callId, received_at: new Date().toISOString(), has_context: !!extracted.context_notes });
   } catch (e) {
     writeJsonl({ type: 'c2.crm_extract_error', call_id: callId, received_at: new Date().toISOString(), error: String(e) });
   }

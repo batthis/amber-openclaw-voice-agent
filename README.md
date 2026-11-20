@@ -31,7 +31,7 @@ Run `node demo/first-call-demo.js` from the project root to walk through the rep
 - **A running host with Node.js and a reachable webhook endpoint** — plus OpenClaw or a configured MCP client for your chosen workflows. Local calendar integration uses `ical-query`.
 - **Usage budget** — voice-provider number/call charges and OpenAI API usage are separate; installing the skill does not include those services. The dashboard shows estimated call costs.
 
-**Privacy notice:** Amber handles real communications data. Calls may be processed by Twilio or another voice provider and OpenAI Realtime, and local logs/transcripts are sensitive. CRM persistence is opt-in with `AMBER_CRM_ENABLED=true`; transcript-based CRM enrichment is separately opt-in with `AMBER_CRM_TRANSCRIPT_ENRICHMENT=true`. Configure caller notice/consent, access controls, retention, and deletion practices before using Amber with real callers.
+**Privacy notice:** Amber handles real communications data. Calls may be processed by Twilio and OpenAI Realtime, and local logs/transcripts are sensitive. CRM persistence is opt-in with `AMBER_CRM_ENABLED=true`; transcript-based CRM enrichment is separately opt-in with `AMBER_CRM_TRANSCRIPT_ENRICHMENT=true`. Configure caller notice/consent, access controls, retention, and deletion practices before using Amber with real callers.
 
 [![ClawHub](https://img.shields.io/badge/ClawHub-amber--phone--agent-blue)](https://clawhub.ai/batthis/amber-phone-agent)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -53,6 +53,12 @@ Amber is not just a standalone voice bot or virtual receptionist. It gives an ag
 - 📝 **AGENT.md** — customize all prompts, greetings, booking flow, and personality in a single editable markdown file (no code changes needed)
 
 ## 🆕 What's New
+
+### v5.5.59 — Call-log privacy and CRM note integrity
+
+- Store only call routing fields required by the dashboard. Omit raw SIP headers and private calendar diagnostics.
+- Preserve existing CRM notes on null updates. Operators can explicitly clear a note.
+- Keep release instructions out of the installed skill and document Twilio as the production voice provider.
 
 ### v5.5.58 — Live-call CRM and Contacts privacy
 
@@ -134,7 +140,7 @@ npm run build && npm start
 
 Point your Twilio voice webhook to `https://<your-domain>/twilio/inbound` and your OpenAI Realtime incoming-call webhook to `https://<your-domain>/openai/webhook`. In another terminal, run `npm run setup -- --check` before calling your Twilio number.
 
-> **Switching providers?** Set `VOICE_PROVIDER=telnyx` (or another supported provider) in your `.env` — no code changes needed. See [SKILL.md](SKILL.md) for details.
+> **Voice provider:** Twilio supports inbound and outbound calls. The Telnyx adapter is an unfinished development stub.
 
 ## ♻️ Runtime Management — Staying Current After Recompilation
 
@@ -282,7 +288,7 @@ Sensitive bridge HTTP endpoints always require bearer authentication, even on lo
 
 Dashboard automatic credentials are sent only to `AMBER_BRIDGE_URL` (default `http://127.0.0.1:8000`), not arbitrary loopback targets. If you use a different local bridge port, set that URL or provide its token in the existing dashboard field. Do not expose the unauthenticated local dashboard itself through a public tunnel; its same-origin checks are browser-CSRF defenses, not remote-user authentication.
 
-Gateway consultations and skill requests use call-scoped session identifiers. Repeated lookups within a call retain their session, but one caller does not inherit another call's conversation. Persistent opt-in CRM behavior is unchanged. Caller transcripts, objectives, names and callback values are user-role JSON data, never higher-priority instructions or verified identity. All message fields stay inside that boundary while the operator still receives the readable call message. This reduces instruction-confusion risk; JSON and prompts do not guarantee model injection immunity or replace the gateway's own least-privilege permissions and approval policies. GPT-4o brain fallback is retained. Calendar operation errors keep diagnostic details only in local call logs, not caller responses.
+Gateway consultations and skill requests use call-scoped session identifiers. Repeated lookups within a call retain their session, but one caller does not inherit another call's conversation. Persistent opt-in CRM behavior is unchanged. Caller transcripts, objectives, names and callback values are user-role JSON data, never higher-priority instructions or verified identity. All message fields stay inside that boundary while the operator still receives the readable call message. This reduces instruction-confusion risk; JSON and prompts do not guarantee model injection immunity or replace the gateway's own least-privilege permissions and approval policies. GPT-4o brain fallback is retained. Calendar audit logs record outcomes and generic error reasons. Call routing records retain numbers and call identifiers for the dashboard. Caller messages and transcripts remain sensitive local records.
 
 ### Optional local authority and persistence
 

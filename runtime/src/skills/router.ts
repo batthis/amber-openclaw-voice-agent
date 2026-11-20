@@ -193,6 +193,9 @@ export async function handleSkillCall(
         return;
       }
       params.phone = contactPhone;
+      if (typeof params.context_notes !== 'string' || !params.context_notes.trim()) {
+        delete params.context_notes;
+      }
     }
 
     deps.writeJsonl({

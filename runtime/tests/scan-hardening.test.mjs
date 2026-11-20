@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { createHmac, randomUUID } from 'node:crypto';
 import { once } from 'node:events';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
@@ -149,6 +149,16 @@ globalThis.fetch = async (url, init) => {
   assert.equal(await realtime('call_replay', header(firstToken)), unknown);
   assert.equal(await realtime('call_sid_only', [{ name: 'X-Twilio-CallSid', value: firstSid }]), unknown);
   assert.equal(await realtime('call_first', header(firstToken)), firstInstructions, 'a retry can still resolve the same call');
+
+  await realtime('call_log_privacy', [...header(secondToken), { name: 'X-Debug', value: 'private metadata' }]);
+  const logsDir = join(dir, 'logs');
+  const metadataFile = (await readdir(logsDir)).find(name => name.endsWith('_call_log_privacy.realtime.call.incoming.json'));
+  assert.ok(metadataFile);
+  const metadata = JSON.parse(await readFile(join(logsDir, metadataFile), 'utf8'));
+  assert.deepEqual(metadata.data.callRouting, {
+    direction: 'inbound', from: null, to: '+12025550123', twilioCallSid: null, bridgeId: null,
+  });
+  assert.deepEqual(Object.keys(metadata.data).sort(), ['callRouting', 'call_id']);
 
   assert.equal((await setScreening(false, false)).status, 401);
   assert.deepEqual(await (await setScreening(false)).json(), { enabled: false });

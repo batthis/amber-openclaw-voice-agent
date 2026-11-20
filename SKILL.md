@@ -3,7 +3,7 @@ name: amber-voice-assistant
 title: "Amber — Give Your Agent Real Phone Capabilities"
 description: "Give your agent a phone number. Amber answers calls, places confirmed outbound calls, completes phone tasks, logs transcripts, and exposes MCP tools."
 homepage: https://github.com/batthis/amber-openclaw-voice-agent
-metadata: {"openclaw":{"emoji":"☎️","requires":{"env":[],"optionalEnv":["AMBER_ENABLE_OUTBOUND_CALLS","AMBER_REALTIME_MODEL","AMBER_REALTIME_VAD_THRESHOLD","AMBER_REALTIME_VAD_PREFIX_PADDING_MS","AMBER_REALTIME_VAD_SILENCE_DURATION_MS","AMBER_CRM_ENABLED","AMBER_CRM_TRANSCRIPT_ENRICHMENT","OPENCLAW_GATEWAY_URL","TWILIO_WEBHOOK_STRICT","VOICE_PROVIDER","VOICE_WEBHOOK_SECRET","ASSISTANT_NAME","OPERATOR_NAME","AMBER_CRM_DB_PATH","AGENT_MD_PATH","DEFAULT_CALENDAR","AMBER_CONTACTS_EXTENDED"],"anyBins":["node","ical-query"]},"permissions":{"network":true,"env":true,"webhooks":true,"localFiles":["runtime/logs/","runtime/contacts-cache.json","~/.config/amber/crm.sqlite"],"localBinaries":["node","ical-query"],"mcpTools":["make_call","get_call_status","get_call_history","crm","contacts_lookup","calendar_query","start_screening","stop_screening","bridge_health"],"externalServices":["Twilio or compatible voice provider","OpenAI Realtime/API","optional OpenClaw Gateway"]},"install":[{"id":"runtime","kind":"node","cwd":"runtime","label":"Install Amber runtime (cd runtime && npm ci && npm run build)"},{"id":"crm-skill","kind":"node","cwd":"amber-skills/crm","label":"Install optional CRM skill dependencies (cd amber-skills/crm && npm ci)"}]}}
+metadata: {"openclaw":{"emoji":"☎️","requires":{"env":[],"optionalEnv":["AMBER_ENABLE_OUTBOUND_CALLS","AMBER_REALTIME_MODEL","AMBER_REALTIME_VAD_THRESHOLD","AMBER_REALTIME_VAD_PREFIX_PADDING_MS","AMBER_REALTIME_VAD_SILENCE_DURATION_MS","AMBER_CRM_ENABLED","AMBER_CRM_TRANSCRIPT_ENRICHMENT","OPENCLAW_GATEWAY_URL","TWILIO_WEBHOOK_STRICT","VOICE_PROVIDER","VOICE_WEBHOOK_SECRET","ASSISTANT_NAME","OPERATOR_NAME","AMBER_CRM_DB_PATH","AGENT_MD_PATH","DEFAULT_CALENDAR","AMBER_CONTACTS_EXTENDED"],"anyBins":["node","ical-query"]},"permissions":{"network":true,"env":true,"webhooks":true,"localFiles":["runtime/logs/","runtime/contacts-cache.json","~/.config/amber/crm.sqlite"],"localBinaries":["node","ical-query"],"mcpTools":["make_call","get_call_status","get_call_history","crm","contacts_lookup","calendar_query","start_screening","stop_screening","bridge_health"],"externalServices":["Twilio","OpenAI Realtime/API","optional OpenClaw Gateway"]},"install":[{"id":"runtime","kind":"node","cwd":"runtime","label":"Install Amber runtime (cd runtime && npm ci && npm run build)"},{"id":"crm-skill","kind":"node","cwd":"amber-skills/crm","label":"Install optional CRM skill dependencies (cd amber-skills/crm && npm ci)"}]}}
 ---
 
 # Amber — Give Your Agent Real Phone Capabilities
@@ -62,7 +62,7 @@ The [setup wizard recording](https://asciinema.org/a/l1nOHktunybwAheQ) shows the
 
 ### What's included
 
-- **Phone number + runtime bridge** (`runtime/`) — a complete Node.js server that connects a Twilio or compatible phone number to OpenAI Realtime with OpenClaw brain-in-the-loop
+- **Phone number + runtime bridge** (`runtime/`) — a complete Node.js server that connects a Twilio phone number to OpenAI Realtime with OpenClaw brain-in-the-loop
 - **Amber Skills** (`amber-skills/`) — modular mid-call capabilities (CRM, calendar, log & forward message) with a spec for building your own
 - **Built-in CRM** — local SQLite contact database; Amber can greet callers by name and use operator-approved context naturally on calls, with operator review/correction responsibility
 - **Call log dashboard** (`dashboard/`) — browse call history, transcripts, captured messages, estimated costs, and one-touch localhost test calls with regular/mini Realtime model selection
@@ -203,32 +203,9 @@ These controls reduce blast radius if a host or config file is exposed.
 - Keep greeting short and clear.
 - Use timeout + graceful fallback when `ask_openclaw` is slow/unavailable.
 
-## Workflow
+## Setup and verification
 
-1. **Confirm scope for V1**
-   - Include only stable behavior: call flow, bridge behavior, fallback behavior, and setup steps.
-   - Exclude machine-specific secrets and private paths.
-
-2. **Document architecture + limits**
-   - Read `references/architecture.md`.
-   - Keep claims realistic (latency varies; memory lookups are best-effort).
-
-3. **Run release checklist**
-   - Read `references/release-checklist.md`.
-   - Validate config placeholders, safety guardrails, and failure handling.
-
-4. **Smoke-check runtime assumptions**
-   - Run `scripts/validate_voice_env.sh` on the target host.
-   - Fix missing env/config before publishing.
-
-5. **Publish**
-   - Publish to ClawHub (example):  
-     `clawhub publish <skill-folder> --slug amber-voice-assistant --name "Amber Voice Assistant" --version 1.0.0 --tags latest --changelog "Initial public release"`
-   - Optional: run your local skill validator/packager before publishing.
-
-6. **Ship updates**
-   - Publish new semver versions (`1.0.1`, `1.1.0`, `2.0.0`) with changelogs.
-   - Keep `latest` on the recommended version.
+Read `references/architecture.md`, run `scripts/validate_voice_env.sh` on the target host, and use the setup wizard's first-call check. Use an authorized test number for inbound and outbound smoke tests.
 
 ## Troubleshooting (common)
 
@@ -237,12 +214,6 @@ These controls reduce blast radius if a host or config file is exposed.
 - **"ask_openclaw timeout"** → verify gateway URL/token and increase timeout conservatively.
 - **"CRM lookup fails after a Node upgrade"** → run `cd amber-skills/crm && npm rebuild better-sqlite3`, then restart the Amber runtime.
 - **"Webhook unreachable"** → verify tunnel/domain and Twilio webhook target.
-
-## Guardrails for public release
-
-- Never publish secrets, tokens, phone numbers, webhook URLs with credentials, or personal data.
-- Include explicit safety rules for outbound calls, payments, and escalation.
-- Mark V1 as beta if conversational quality/latency tuning is ongoing.
 
 ## Install safety notes
 
@@ -255,7 +226,6 @@ These controls reduce blast radius if a host or config file is exposed.
 
 - **Runtime bridge:** `runtime/` (full source + README)
 - Architecture and behavior notes: `references/architecture.md`
-- Release gate: `references/release-checklist.md`
 - Env template: `references/env.example`
 - Quick setup runner: `scripts/setup_quickstart.sh`
 - Env/config validator: `scripts/validate_voice_env.sh`
@@ -267,7 +237,7 @@ Sensitive bridge HTTP endpoints always require bearer authentication, even on lo
 
 Dashboard automatic credentials are sent only to `AMBER_BRIDGE_URL` (default `http://127.0.0.1:8000`), not arbitrary loopback targets. If you use a different local bridge port, set that URL or provide its token in the existing dashboard field. Do not expose the unauthenticated local dashboard itself through a public tunnel; its same-origin checks are browser-CSRF defenses, not remote-user authentication.
 
-Gateway consultations and skill requests use call-scoped session identifiers. Repeated lookups within a call retain their session, but one caller does not inherit another call's conversation. Persistent opt-in CRM behavior is unchanged. Caller transcripts, objectives, names and callback values are user-role JSON data, never higher-priority instructions or verified identity. All message fields stay inside that boundary while the operator still receives the readable call message. This reduces instruction-confusion risk; JSON and prompts do not guarantee model injection immunity or replace the gateway's own least-privilege permissions and approval policies. GPT-4o brain fallback is retained. Calendar operation errors keep diagnostic details only in local call logs, not caller responses.
+Gateway consultations and skill requests use call-scoped session identifiers. Repeated lookups within a call retain their session, but one caller does not inherit another call's conversation. Persistent opt-in CRM behavior is unchanged. Caller transcripts, objectives, names and callback values are user-role JSON data, never higher-priority instructions or verified identity. All message fields stay inside that boundary while the operator still receives the readable call message. This reduces instruction-confusion risk; JSON and prompts do not guarantee model injection immunity or replace the gateway's own least-privilege permissions and approval policies. GPT-4o brain fallback is retained. Calendar audit logs record outcomes and generic error reasons. Call routing records retain numbers and call identifiers for the dashboard. Caller messages and transcripts remain sensitive local records.
 
 ### Optional local authority and persistence
 

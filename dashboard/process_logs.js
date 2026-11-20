@@ -572,21 +572,21 @@ async function processLogsWithOptions(options) {
                 const callId = data?.data?.call_id;
                 if (!callId) continue;
 
-                const sipHeaders = data?.data?.sip_headers || [];
-                const phoneNumbers = extractPhoneNumbersFromSipHeaders(sipHeaders);
+                const routing = data.data.callRouting;
+                const phoneNumbers = routing || extractPhoneNumbersFromSipHeaders(data.data.sip_headers);
 
                 const tsFromName = parseTimestampMsFromIncomingFilename(file);
                 const tsFromCreatedAt = typeof data.created_at === 'number' ? data.created_at * 1000 : null;
                 const timestampMs = tsFromName || tsFromCreatedAt || fs.statSync(filePath).mtimeMs;
 
-                // Determine direction: if From is our Twilio number, it's outbound
-                const direction = (phoneNumbers.from === TWILIO_NUMBER) ? 'outbound' : 'inbound';
+                // New records carry the verified direction. Legacy records use the caller number.
+                const direction = routing?.direction
+                    || ((phoneNumbers.from === TWILIO_NUMBER) ? 'outbound' : 'inbound');
 
                 callMetadata[callId] = {
                     timestamp: timestampMs,
                     direction,
                     ...phoneNumbers,
-                    incomingEvent: data,
                     incomingFile: file
                 };
             } catch (e) {

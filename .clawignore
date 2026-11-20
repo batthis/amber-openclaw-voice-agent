@@ -15,3 +15,9 @@ dashboard/data/
 dashboard/data-tmp-bridge/
 tmp-bridge-logs/
 .DS_Store
+
+# Maintainer-only plans and release instructions
+ASTERISK-IMPLEMENTATION-PLAN.md
+DO-NOT-CHANGE.md
+FEEDBACK.md
+references/release-checklist.md

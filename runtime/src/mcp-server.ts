@@ -358,6 +358,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
             type: 'string',
             description: 'Notes about the contact or interaction',
           },
+          context_notes: {
+            type: 'string',
+            description: 'Contact notes for create or update. Omit to retain the existing notes. Use an empty string to clear them.',
+          },
           tags: {
             type: 'array',
             items: { type: 'string' },
