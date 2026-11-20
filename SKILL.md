@@ -18,7 +18,7 @@ Use it when you want an agent to do the plain-English phone job: call this busin
 
 Beyond phone calls, configured MCP clients can query availability and create calendar events through `ical-query`, and independently use optional CRM contact creation, updates, history, and interaction logging. Calendar writes require explicit confirmation. Contact lookup uses an operator-generated local Apple Contacts cache; the sync helper exports contact names/numbers, with optional extended notes, relationships, and addresses only when `AMBER_CONTACTS_EXTENDED=true`. CRM and transcript enrichment remain separately opt-in. Review local cache, database and transcript retention before use.
 
-Automatic inbound CRM attribution and personalized greetings require the call reference Amber creates from a signed Twilio webhook. An inbound call without a matching reference still goes through screening under the default greeting.
+Automatic inbound CRM attribution and personalized greetings require the call reference Amber creates from a signed Twilio webhook. Live-call CRM actions use the number tied to the call. Operator MCP tools can search and manage other contacts. An inbound call without a matching reference still goes through screening under the default greeting.
 
 The authenticated MCP screening controls pause or resume new inbound calls. While paused, Amber returns a busy response on its Twilio number. Calls already connected and confirmed outbound calls can continue. The preference is saved under the bridge’s working directory and persists across restarts. Configure forwarding separately in Twilio if you need a human fallback.
 
@@ -114,7 +114,7 @@ Amber's skill system is designed to grow. Each skill is a self-contained directo
 
 See [`amber-skills/`](amber-skills/) for examples and the full specification to get started.
 
-**Contacts privacy:** Apple Contacts sync is opt-in. By default it exports only names and phone numbers needed for call-by-name. Set `AMBER_CONTACTS_EXTENDED=true` only if you explicitly want extra local-only fields such as email, organization, relationships, addresses, and notes in `runtime/contacts-cache.json`.
+**Contacts privacy:** Apple Contacts sync is opt-in. By default it reads and exports only names, phone numbers, and phone labels needed for call-by-name. Set `AMBER_CONTACTS_EXTENDED=true` only if you explicitly want extra local-only fields such as email, organization, relationships, addresses, and notes in `runtime/contacts-cache.json`.
 
 > **Note:** Each skill's `handler.js` is reviewed against its declared permissions. When building or installing third-party skills, review the handler source as you would any Node.js module.
 

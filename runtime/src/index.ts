@@ -1049,7 +1049,7 @@ const callAccept = {
             operatorName: OPERATOR_NAME || '',
             operatorTelegramId: undefined, // determined by OpenClaw gateway routing
             callId,
-            callerId: inbound?.from || '',
+            callerId: fnName === 'crm' ? callerPhone ?? '' : inbound?.from ?? '',
             transcript: '', // transcript is streaming; skills get what's available
             writeJsonl,
             sendFunctionCallOutput: (wsRef: any, fCallId: string, output: string) =>

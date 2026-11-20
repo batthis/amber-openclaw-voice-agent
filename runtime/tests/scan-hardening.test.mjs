@@ -10,7 +10,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import test from 'node:test';
 import twilio from 'twilio';
 import { runLocalHelper } from '../dist/local-helper-runner.js';
-import { handleSkillCall, registerSkills } from '../dist/skills/router.js';
+import { callSkillDirectly, handleSkillCall, registerSkills } from '../dist/skills/router.js';
 
 test('signed inbound calls keep their own caller context and screening pause survives restart', async (t) => {
   const dir = await mkdtemp(join(tmpdir(), 'amber-screening-'));
@@ -213,4 +213,52 @@ test('local helper permits the approved path and denies same-name executables at
   const file = process.execPath;
   assert.equal(await runLocalHelper(file, args, { allowedBinaries: [file] }), '2');
   await assert.rejects(runLocalHelper(file, args, { allowedBinaries: [basename(file)] }), /not in allowed list/);
+});
+
+test('live-call CRM is bound to the call contact and the internal CRM path remains available', async () => {
+  const contactPhone = '+12025550142';
+  const otherPhone = '+12025550143';
+  const executions = [];
+  registerSkills([{
+    manifest: { name: 'crm', amber: {
+      function_schema: { name: 'crm' },
+      capabilities: ['read', 'act'],
+      confirmation_required: false,
+      permissions: {},
+      timeout_ms: 100,
+    } },
+    handler: async (params) => {
+      executions.push(params);
+      return { success: true };
+    },
+  }]);
+  const context = {
+    operatorName: 'Operator',
+    callId: 'call',
+    callerId: contactPhone,
+    transcript: '',
+    clawdClient: null,
+    writeJsonl: () => {},
+  };
+  async function call(params, callerId = contactPhone) {
+    let result;
+    await handleSkillCall('crm', JSON.stringify(params), null, 'function-call', {
+      ...context,
+      callerId,
+      sendFunctionCallOutput: (_ws, _id, output) => { result = JSON.parse(output); },
+    });
+    return result;
+  }
+
+  for (const action of ['upsert_contact', 'log_interaction', 'tag_contact', 'lookup_contact', 'get_history']) {
+    assert.equal((await call({ action, phone: otherPhone })).success, false);
+  }
+  assert.equal((await call({ action: 'search_contacts', query: 'Alex' })).success, false);
+  assert.equal((await call({ action: 'upsert_contact', phone: contactPhone }, '')).success, false);
+  assert.equal(executions.length, 0);
+
+  assert.equal((await call({ action: 'upsert_contact', name: 'Alex' })).success, true);
+  assert.equal((await call({ action: 'log_interaction', phone: contactPhone })).success, true);
+  assert.equal((await callSkillDirectly('crm', { action: 'lookup_contact', phone: otherPhone }, context)).success, true);
+  assert.deepEqual(executions.map(({ phone }) => phone), [contactPhone, contactPhone, otherPhone]);
 });

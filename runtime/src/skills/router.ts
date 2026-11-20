@@ -11,6 +11,9 @@ import OpenAI from 'openai';
 
 /** In-memory registry of loaded skills, keyed by function name */
 const skillRegistry = new Map<string, LoadedSkill>();
+const callScopedCrmActions = new Set([
+  'lookup_contact', 'upsert_contact', 'log_interaction', 'get_history', 'tag_contact',
+]);
 const directSkillAllowlist = new Map<string, Set<string>>([
   ['crm', new Set(['lookup_contact', 'upsert_contact', 'log_interaction'])],
 ]);
@@ -176,6 +179,21 @@ export async function handleSkillCall(
       params = {};
     }
     params = sanitizeParams(params);
+
+    if (fnName === 'crm') {
+      const contactPhone = deps.callerId;
+      const suppliedPhone = params.phone;
+      if (!callScopedCrmActions.has(params.action)
+        || !/^\+[1-9]\d{6,14}$/.test(contactPhone)
+        || (suppliedPhone !== undefined && suppliedPhone !== '' && suppliedPhone !== contactPhone)) {
+        deps.sendFunctionCallOutput(ws, fnCallId, JSON.stringify({
+          success: false,
+          response: 'Live-call CRM is limited to the contact associated with this call. Use the operator CRM tools for other contacts.',
+        }));
+        return;
+      }
+      params.phone = contactPhone;
+    }
 
     deps.writeJsonl({
       type: 'c2.skill_call',

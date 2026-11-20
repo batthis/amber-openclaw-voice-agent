@@ -54,6 +54,11 @@ Amber is not just a standalone voice bot or virtual receptionist. It gives an ag
 
 ## 🆕 What's New
 
+### v5.5.58 — Live-call CRM and Contacts privacy
+
+- Limit live-call CRM actions to the phone number tied to the call. Operator MCP tools can still search and manage all contacts.
+- Query names, phone numbers, and phone labels by default during Apple Contacts sync. Read extended contact fields only after opt-in.
+
 ### v5.5.57 — Caller attribution and screening controls
 
 - Match inbound CRM attribution to a signed Twilio callback and a call-specific SIP reference.
