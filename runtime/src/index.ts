@@ -801,19 +801,6 @@ const callAccept = {
     ws.on('open', () => {
       writeJsonl({ type: 'ws.open', call_id: callId, received_at: new Date().toISOString() });
 
-      // Pre-fetch calendar for the week ahead (fire-and-forget)
-      // Gives Amber a static snapshot of availability at call start — faster responses
-      askOpenClaw('Pre-fetch and cache calendar availability for the next 7 days. Return a summary of free/busy times.', {
-        callId,
-        objective: outboundObjective,
-        callPlan: outboundCallPlan,
-        transcript: ''
-      }).then(() => {
-        writeJsonl({ type: 'c2.calendar_prefetch', call_id: callId, received_at: new Date().toISOString(), status: 'ok' });
-      }).catch((e) => {
-        writeJsonl({ type: 'c2.calendar_prefetch', call_id: callId, received_at: new Date().toISOString(), status: 'error', error: String(e) });
-      });
-
       // Phase C2: Re-register tools + VAD tuning via session.update
       {
         const sessionUpdate = {
@@ -1641,7 +1628,7 @@ async function askOpenClaw(
 ): Promise<string> {
   const timeoutMs = 20_000;
 
-  // Gateway sessions are isolated by call, including the calendar prefetch.
+  // Gateway sessions are isolated by call.
   if (OPENCLAW_GATEWAY_CREDENTIAL) {
     try {
       const answer = await askOpenClawViaGateway(question, callContext, timeoutMs);

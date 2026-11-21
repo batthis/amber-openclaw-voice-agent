@@ -23,6 +23,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { getMcpRuntimeConfig } from './config.js';
 import { runLocalHelper } from './local-helper-runner.js';
+import { loadApprovedSkills } from './skills/loader.js';
 
 // ─── Configuration ───
 
@@ -34,6 +35,8 @@ const OPERATOR_NAME = runtimeConfig.operatorName;
 const LOGS_DIR = runtimeConfig.logsDir;
 const OUTBOUND_CALLS_ENABLED = runtimeConfig.outboundCallsEnabled;
 const CRM_ENABLED = runtimeConfig.crmEnabled;
+const skillsDir = path.join(__dirname, '..', '..', 'amber-skills');
+const approvedSkills = loadApprovedSkills(skillsDir);
 
 // ─── Helpers ───
 
@@ -62,10 +65,16 @@ async function bridgeRequest(endpoint: string, body: Record<string, any>): Promi
  * These don't need the bridge running — they use local binaries/files.
  */
 async function executeSkillHandler(
-  skillName: string,
+  skillName: 'calendar' | 'crm',
   params: Record<string, any>
 ): Promise<{ success: boolean; message?: string; result?: any; error?: string }> {
-  const handlerPath = path.join(__dirname, '..', '..', 'amber-skills', skillName, 'handler.js');
+  if (!approvedSkills.has(skillName)) {
+    return {
+      success: false,
+      message: `Amber skill "${skillName}" is disabled by the operator's approved skill list.`,
+    };
+  }
+  const handlerPath = path.join(skillsDir, skillName, 'handler.js');
 
   if (!fs.existsSync(handlerPath)) {
     return { success: false, error: `Skill handler not found: ${skillName}` };
@@ -276,7 +285,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         properties: {},
       },
     },
-    {
+    ...(approvedSkills.has('calendar') ? [{
       name: 'calendar_query',
       description:
         'Check calendar availability or create events. For lookups, returns ' +
@@ -324,8 +333,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         },
         required: ['action'],
       },
-    },
-    ...(CRM_ENABLED ? [{
+    }] : []),
+    ...(CRM_ENABLED && approvedSkills.has('crm') ? [{
       name: 'crm',
       description:
         'Manage contacts and interaction history. Look up contacts by phone or name, ' +

@@ -12,20 +12,72 @@ import twilio from 'twilio';
 import { runLocalHelper } from '../dist/local-helper-runner.js';
 import { callSkillDirectly, handleSkillCall, registerSkills } from '../dist/skills/router.js';
 
-test('signed inbound calls keep their own caller context and screening pause survives restart', async (t) => {
+test('signed inbound calls keep caller context, query calendars on demand, and preserve screening state', async (t) => {
   const dir = await mkdtemp(join(tmpdir(), 'amber-screening-'));
   await mkdir(join(dir, 'data'));
   await writeFile(join(dir, 'data', 'bridge-outbound-map.json'), JSON.stringify({
     approved: { key: 'approved', objective: 'Ask for business hours', createdAtMs: Date.now() },
   }));
   const captures = join(dir, 'accepts.jsonl');
+  const calendarTrace = join(dir, 'calendar.jsonl');
+  const mockSocket = join(dir, 'mock-websocket.mjs');
+  await writeFile(mockSocket, `
+import { EventEmitter } from 'node:events';
+import { appendFileSync } from 'node:fs';
+
+const trace = (entry) => appendFileSync(${JSON.stringify(calendarTrace)}, JSON.stringify(entry) + '\\n');
+export default class extends EventEmitter {
+  constructor(url) {
+    super();
+    if (!String(url).endsWith('call_calendar')) throw new Error('Unexpected call socket');
+    setImmediate(() => {
+      this.emit('open');
+      setImmediate(() => {
+        trace({ type: 'requested' });
+        this.emit('message', Buffer.from(JSON.stringify({
+          type: 'response.function_call_arguments.done',
+          item_id: 'availability',
+          name: 'ask_openclaw',
+          arguments: JSON.stringify({ question: 'Is Friday at 2 PM available for an appointment?' }),
+        })));
+      });
+    });
+  }
+  send(body) {
+    const item = JSON.parse(body).item;
+    if (item?.type === 'function_call_output') trace({ type: 'output', result: JSON.parse(item.output) });
+  }
+}
+`);
+  const loader = join(dir, 'mock-websocket-loader.mjs');
+  await writeFile(loader, `
+import { pathToFileURL } from 'node:url';
+export function resolve(specifier, context, nextResolve) {
+  if (specifier === 'ws' && context.parentURL === pathToFileURL(${JSON.stringify(resolve('dist/index.js'))}).href) {
+    return { url: pathToFileURL(${JSON.stringify(mockSocket)}).href, shortCircuit: true };
+  }
+  return nextResolve(specifier, context);
+}
+`);
   const preload = join(dir, 'mock-openai.mjs');
   await writeFile(preload, `
 import { appendFileSync } from 'node:fs';
+import { register } from 'node:module';
+import { pathToFileURL } from 'node:url';
+register(pathToFileURL(${JSON.stringify(loader)}));
+const trace = (entry) => appendFileSync(${JSON.stringify(calendarTrace)}, JSON.stringify(entry) + '\\n');
+
 globalThis.fetch = async (url, init) => {
-  if (!String(url).startsWith('https://api.openai.com/v1/realtime/calls/')) {
+  const destination = String(url);
+  if (destination === 'https://gateway.example.test/v1/chat/completions') {
+    const request = JSON.parse(init.body);
+    trace({ type: 'gateway', question: JSON.parse(request.messages[1].content).question });
+    return Response.json({ choices: [{ message: { content: 'Friday at 2 PM is free.' } }] });
+  }
+  if (!destination.startsWith('https://api.openai.com/v1/realtime/calls/')) {
     throw new Error('Unexpected network request from bridge test');
   }
+  if (destination.endsWith('/call_calendar/accept')) return Response.json({});
   appendFileSync(${JSON.stringify(captures)}, init.body + '\\n');
   return new Response('Test stops before starting a call socket', { status: 500 });
 };
@@ -68,6 +120,8 @@ globalThis.fetch = async (url, init) => {
         TWILIO_CALLER_ID: '+12025550123',
         GENZ_CALLER_NUMBERS: caller,
         OPENAI_API_KEY: 'test-only',
+        OPENCLAW_GATEWAY_URL: 'https://gateway.example.test',
+        OPENCLAW_GATEWAY_TOKEN: 'test-only',
         OPENAI_PROJECT_ID: 'test-only',
         OPENAI_WEBHOOK_SECRET: webhookKey,
         BRIDGE_API_TOKEN: bridgeToken,
@@ -132,6 +186,20 @@ globalThis.fetch = async (url, init) => {
   }
 
   await start();
+  await realtime('call_calendar', [], 200);
+  let calendarEvents = [];
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const contents = await readFile(calendarTrace, 'utf8').catch(() => '');
+    calendarEvents = contents.trim().split('\n').filter(Boolean).map((line) => JSON.parse(line));
+    if (calendarEvents.some(({ type }) => type === 'output')) break;
+    await delay(25);
+  }
+  assert.deepEqual(calendarEvents, [
+    { type: 'requested' },
+    { type: 'gateway', question: 'Is Friday at 2 PM available for an appointment?' },
+    { type: 'output', result: { answer: 'Friday at 2 PM is free.' } },
+  ]);
+
   const firstSid = 'CA' + '1'.repeat(32);
   const first = await twilioInbound(caller, firstSid);
   const second = await twilioInbound('+12025550143', 'CA' + '2'.repeat(32));
