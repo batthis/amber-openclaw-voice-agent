@@ -120,7 +120,10 @@ export function loadApprovedSkills(skillsDir: string): Set<string> {
  * Only skills listed in amber-skills/SKILL_MANIFEST.json are loaded.
  * Returns array of loaded skills ready for registration.
  */
-export function loadSkills(skillsDir: string): LoadedSkill[] {
+export function loadSkills(
+  skillsDir: string,
+  isEnabled: (manifest: AmberSkillManifest, directoryName: string) => boolean = () => true,
+): LoadedSkill[] {
   const loaded: LoadedSkill[] = [];
 
   if (!fs.existsSync(skillsDir)) {
@@ -164,7 +167,7 @@ export function loadSkills(skillsDir: string): LoadedSkill[] {
       const data = parseFrontmatter(content);
       const manifest = validateManifest(data, entry.name);
 
-      if (!manifest) continue;
+      if (!manifest || !isEnabled(manifest, entry.name)) continue;
 
       // Load handler — only reaches here if skill is in the approved allowlist
       // eslint-disable-next-line @typescript-eslint/no-var-requires

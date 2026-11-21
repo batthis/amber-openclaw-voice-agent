@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
-import { cp, mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
+import { access, cp, mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { loadSkills } from '../dist/skills/loader.js';
 
 test('the local MCP server lists and invokes only operator-approved Calendar and CRM skills', async (t) => {
   const root = await mkdtemp(join(tmpdir(), 'amber-mcp-policy-'));
@@ -53,4 +54,28 @@ test('the local MCP server lists and invokes only operator-approved Calendar and
   }
   await check(['calendar', 'crm']);
   await check([]);
+});
+
+test('a disabled voice skill is never loaded even when the operator allowlists its directory', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'amber-voice-policy-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const crm = join(root, 'crm');
+  const loadedMarker = join(root, 'handler-imported');
+  await mkdir(crm);
+  await writeFile(join(root, 'SKILL_MANIFEST.json'), JSON.stringify({ approvedSkills: ['crm'] }));
+  await writeFile(join(crm, 'SKILL.md'), [
+    '---',
+    'name: crm',
+    'metadata: {"amber":{"capabilities":["read"],"function_schema":{"name":"crm"}}}',
+    '---',
+  ].join('\n'));
+  await writeFile(join(crm, 'handler.js'), `
+    require('node:fs').writeFileSync(${JSON.stringify(loadedMarker)}, 'loaded');
+    module.exports = async () => ({ success: true });
+  `);
+
+  assert.deepEqual(loadSkills(root, (manifest) => manifest.name !== 'crm'), []);
+  await assert.rejects(access(loadedMarker), { code: 'ENOENT' });
+  assert.deepEqual(loadSkills(root).map((skill) => skill.manifest.name), ['crm']);
+  await access(loadedMarker);
 });

@@ -855,7 +855,7 @@ const callAccept = {
 
       // CRM auto-lookup — runs before greeting so name/context is available immediately.
       // SQLite is synchronous and local so this resolves in <5ms — no caller-perceptible delay.
-      if (CRM_ENABLED && callerPhone) {
+      if (crmReady && callerPhone) {
         const crmApiDeps = {
           clawdClient,
           operatorName: OPERATOR_NAME || '',
@@ -1080,7 +1080,7 @@ const callAccept = {
 
       // Opt-in CRM auto-log. Enable with AMBER_CRM_ENABLED=true after caller
       // notice/consent and retention practices are configured.
-      if (CRM_ENABLED && callerPhone) {
+      if (crmReady && callerPhone) {
         try {
           const transcriptText = fs.existsSync(logsTranscriptPath(callId))
             ? fs.readFileSync(logsTranscriptPath(callId), 'utf8').trim()
@@ -1114,12 +1114,10 @@ const callAccept = {
 
           writeJsonl({ type: 'c2.crm_auto_logged', call_id: callId, received_at: new Date().toISOString() });
 
-          if (CRM_TRANSCRIPT_ENRICHMENT_ENABLED) {
-            // Pass 2: opt-in LLM extraction enriches name, context_notes, and summary from full transcript.
-            extractAndUpdateCrmFromTranscript(callId, callerPhone, writeJsonl).catch((e) => {
-              writeJsonl({ type: 'c2.crm_extract_fatal', call_id: callId, error: String(e) });
-            });
-          }
+          // Pass 2: opt-in extraction can enrich CRM from the full transcript.
+          extractAndUpdateCrmFromTranscript(callId, callerPhone, writeJsonl).catch((e) => {
+            writeJsonl({ type: 'c2.crm_extract_fatal', call_id: callId, error: String(e) });
+          });
         } catch (e) {
           writeJsonl({ type: 'c2.crm_auto_log_error', call_id: callId, received_at: new Date().toISOString(), error: String(e) });
         }
@@ -1145,13 +1143,12 @@ const callAccept = {
 
 // ─── Load Amber Skills at startup ───
 const SKILLS_DIR = path.resolve(new URL('.', import.meta.url).pathname, '../../amber-skills');
-const loadedSkills = loadSkills(SKILLS_DIR).filter((skill) => {
-  if (skill.manifest.name !== 'crm') return true;
-  if (CRM_ENABLED) return true;
-  console.log('[skills] Skipping crm: AMBER_CRM_ENABLED is not true');
-  return false;
-});
-registerSkills(loadedSkills);
+registerSkills(loadSkills(SKILLS_DIR, (manifest, directoryName) =>
+  CRM_ENABLED || (directoryName !== 'crm'
+    && manifest.name !== 'crm'
+    && manifest.amber.function_schema.name !== 'crm')
+));
+const crmReady = CRM_ENABLED && isSkillFunction('crm');
 
 app.listen(PORT, () => {
   console.log(`twilio-openai-sip-bridge listening on http://127.0.0.1:${PORT}`);
@@ -2044,6 +2041,7 @@ async function extractAndUpdateCrmFromTranscript(
   callerPhone: string,
   writeJsonl: (obj: unknown) => void
 ): Promise<void> {
+  if (!crmReady || !CRM_TRANSCRIPT_ENRICHMENT_ENABLED) return;
   try {
     const transcriptPath = logsTranscriptPath(callId);
     if (!fs.existsSync(transcriptPath)) return;
