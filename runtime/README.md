@@ -190,7 +190,7 @@ When configured, the assistant can delegate complex queries (calendar lookups, c
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `OUTBOUND_MAP_PATH` | Path for outbound call metadata | `./data/bridge-outbound-map.json` |
+| `OUTBOUND_MAP_PATH` | Path for owner-only outbound call metadata. Structured plans expire after ten minutes. Routing and objectives remain available for dashboard history. | `./data/bridge-outbound-map.json` |
 
 ## API Endpoints
 

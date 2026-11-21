@@ -12,7 +12,7 @@ const approved='Ask the restaurant its opening hours';
 const entry=path.resolve('dist/index.js');
 test('signed SIP events cannot replace approved outbound objectives or turn inbound calls into outbound instructions',async()=>{
  const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'amber-sip-objective-')); fs.mkdirSync(path.join(tmp,'data'));
- fs.writeFileSync(path.join(tmp,'data/bridge-outbound-map.json'),JSON.stringify({approved:{key:'approved',objective:approved,model:'gpt-realtime-mini-2025-12-15',createdAtMs:Date.now()},expired:{key:'expired',objective:approved,createdAtMs:Date.now()-11*60*1000}}));
+ fs.writeFileSync(path.join(tmp,'data/bridge-outbound-map.json'),JSON.stringify({schema:1,calls:{testSid:{bridgeId:'approved',objective:approved,model:'gpt-realtime-mini-2025-12-15',createdAtMs:Date.now()},expiredSid:{bridgeId:'expired',objective:approved,callPlan:{customer:{name:'Stale name'}},createdAtMs:Date.now()-11*60*1000}}}));
  const captured=path.join(tmp,'accepts.jsonl');const preload=path.join(tmp,'mock-fetch.mjs');
  fs.writeFileSync(preload,`import fs from 'node:fs';globalThis.fetch=async(url,init)=>{if(!String(url).startsWith('https://api.openai.com/v1/realtime/calls/'))throw Error('Blocked external access: '+url);fs.appendFileSync(${JSON.stringify(captured)},init.body+'\\n');return new Response('MOCK: stopped before websocket/provider use',{status:500});};`);
  const reserve=http.createServer();reserve.listen(0,'127.0.0.1');await once(reserve,'listening');const port=reserve.address().port;await new Promise(r=>reserve.close(r));

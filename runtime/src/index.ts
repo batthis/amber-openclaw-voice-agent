@@ -14,6 +14,7 @@ import type { HandleSkillCallDeps } from './skills/index.js';
 import { BRIDGE_CREDENTIAL as DEFAULT_BRIDGE_CREDENTIAL, CRM_ENABLED, CRM_TRANSCRIPT_ENRICHMENT_ENABLED, DEFAULT_OPENAI_VOICE, GATEWAY_BASE_URL, GATEWAY_CREDENTIAL, IS_PRODUCTION_RUNTIME, IS_TEST_RUNTIME, OUTBOUND_CALLS_ENABLED, PROVIDER_WEBHOOK_STRICT, REALTIME_INTERRUPT_RESPONSE, REALTIME_MODEL, REALTIME_MODELS, REALTIME_NOISE_REDUCTION, REALTIME_VAD_PREFIX_PADDING_MS, REALTIME_VAD_SILENCE_DURATION_MS, REALTIME_VAD_THRESHOLD, RUNTIME_PORT, getPersonalizationConfig, getTelephonyRuntimeConfig, getTelnyxRuntimeConfig, getVoiceProviderName, normalizeRealtimeModel, requireRuntimeEnv } from './config.js';
 
 import { CallApprovals, verifyOpenAIWebhook, crmGreetingData } from './security.js';
+import { freshOutboundIntent, updateOutboundMetadata } from './outbound-metadata.js';
 import { consultationData, callSessionKey, realtimeEventForLog } from './trust-boundaries.js';
 
 const callApprovals = new CallApprovals();
@@ -413,26 +414,34 @@ type OutboundIntent = {
   to?: string; // E.164 number being called — used for CRM lookup on outbound calls
   createdAtMs: number;
 };
-const OUTBOUND_INTENT_RETENTION_MS = 10 * 60 * 1000;
 const outboundIntentByKey = new Map<string, OutboundIntent>();
 
-// ─── Restore outbound intent map from disk on startup ───
-// This ensures Twilio webhook callbacks still work after a bridge restart.
-{
-  const mapPath = path.join(process.cwd(), 'data', 'bridge-outbound-map.json');
-  try {
-    if (fs.existsSync(mapPath)) {
-      const persisted: Record<string, OutboundIntent> = JSON.parse(fs.readFileSync(mapPath, 'utf8'));
-      const cutoff = Date.now() - OUTBOUND_INTENT_RETENTION_MS;
-      for (const [k, v] of Object.entries(persisted)) {
-        if (v.createdAtMs > cutoff) outboundIntentByKey.set(k, v);
-      }
-      console.log(`[startup] Restored ${outboundIntentByKey.size} outbound intent(s) from disk.`);
-    }
-  } catch (e) {
-    console.warn('[startup] Could not restore outbound intent map:', e);
+// Restore only fresh operator-approved intents so pending calls survive a restart.
+try {
+  const now = Date.now();
+  const stored = updateOutboundMetadata<CallPlan>(OUTBOUND_MAP_PATH, now);
+  for (const [id, item] of Object.entries(stored)) {
+    if (!freshOutboundIntent(item.createdAtMs, now)) continue;
+    const key = item.bridgeId ?? id;
+    const callPlan = item.callPlan ?? undefined;
+    const objective = item.objective || callPlanToObjective(callPlan);
+    outboundIntentByKey.set(key, { ...item, key, objective, callPlan });
   }
+} catch {
+  console.warn('[startup] Could not restore outbound call metadata.');
 }
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, item] of outboundIntentByKey) {
+    if (!freshOutboundIntent(item.createdAtMs, now)) outboundIntentByKey.delete(key);
+  }
+  try {
+    updateOutboundMetadata<CallPlan>(OUTBOUND_MAP_PATH, now);
+  } catch {
+    console.warn('Could not expire outbound call plans.');
+  }
+}, 60_000).unref();
 
 // Twilio callbacks are typically form-encoded
 app.use('/twilio', express.urlencoded({ extended: false }));
@@ -594,29 +603,16 @@ app.post(['/call/outbound', '/call/preview'], requireAuth, async (req: Request, 
       statusCallbackEvents: ['initiated', 'ringing', 'answered', 'completed'],
     });
 
-    // Persist outbound map so downstream log sync can show the dialed PSTN number.
-    // Schema: { schema:1, updatedAt, calls:{ [twilioCallSid]: { to, bridgeId, objective, createdAtMs } } }
+    // Save routing and objective for the dashboard, with a short-lived plan
+    // so an approved outbound call can still connect after a bridge restart.
+    const createdAtMs = Date.now();
     try {
-      const mapPath = OUTBOUND_MAP_PATH;
-      ensureDirSync(path.dirname(mapPath));
-      let existing: any = { schema: 1, updatedAt: new Date().toISOString(), calls: {} };
-      if (fs.existsSync(mapPath)) {
-        try { existing = JSON.parse(fs.readFileSync(mapPath, 'utf8')); } catch {}
-        if (!existing || typeof existing !== 'object') existing = { schema: 1, calls: {} };
-        if (!existing.calls || typeof existing.calls !== 'object') existing.calls = {};
-      }
-      existing.calls[call.sid] = {
-        to,
-        bridgeId,
-        objective: objective || null,
-        callPlan: callPlan || null,
-        model,
-        createdAtMs: Date.now()
-      };
-      existing.updatedAt = new Date().toISOString();
-      fs.writeFileSync(mapPath, JSON.stringify(existing, null, 2) + '\n', 'utf8');
-    } catch (e) {
-      console.error('Failed to persist bridge-outbound-map.json', e);
+      updateOutboundMetadata<CallPlan>(OUTBOUND_MAP_PATH, createdAtMs, {
+        sid: call.sid,
+        metadata: { to, bridgeId, objective: objective || null, callPlan, model, createdAtMs },
+      });
+    } catch {
+      console.error('Failed to persist outbound call metadata.');
     }
 
     if (objective || callPlan || requestedModel) {
@@ -627,7 +623,7 @@ app.post(['/call/outbound', '/call/preview'], requireAuth, async (req: Request, 
         callPlan,
         model,
         to,
-        createdAtMs: Date.now()
+        createdAtMs,
       });
     }
 
@@ -1757,14 +1753,14 @@ function callPlanToObjective(cp?: CallPlan): string {
 
 function getOutboundCallPlanForKey(key: string, nowMs: number): CallPlan | undefined {
   for (const [k, info] of outboundIntentByKey.entries()) {
-    if (nowMs - info.createdAtMs > OUTBOUND_INTENT_RETENTION_MS) outboundIntentByKey.delete(k);
+    if (!freshOutboundIntent(info.createdAtMs, nowMs)) outboundIntentByKey.delete(k);
   }
   return outboundIntentByKey.get(key)?.callPlan;
 }
 
 function getOutboundModelForKey(key: string, nowMs: number): string | undefined {
   for (const [k, info] of outboundIntentByKey.entries()) {
-    if (nowMs - info.createdAtMs > OUTBOUND_INTENT_RETENTION_MS) outboundIntentByKey.delete(k);
+    if (!freshOutboundIntent(info.createdAtMs, nowMs)) outboundIntentByKey.delete(k);
   }
   const model = normalizeRealtimeModel(outboundIntentByKey.get(key)?.model ?? '');
   return REALTIME_MODELS.includes(model) ? model : undefined;
@@ -1773,7 +1769,7 @@ function getOutboundModelForKey(key: string, nowMs: number): string | undefined 
 function getOutboundObjectiveForKey(key: string, nowMs: number): string | undefined {
   // Cleanup first
   for (const [k, info] of outboundIntentByKey.entries()) {
-    if (nowMs - info.createdAtMs > OUTBOUND_INTENT_RETENTION_MS) outboundIntentByKey.delete(k);
+    if (!freshOutboundIntent(info.createdAtMs, nowMs)) outboundIntentByKey.delete(k);
   }
   const rec = outboundIntentByKey.get(key);
   if (!rec) {

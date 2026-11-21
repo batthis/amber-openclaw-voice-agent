@@ -58,6 +58,11 @@ Amber is not just a standalone voice bot or virtual receptionist. It gives an ag
 
 ## 🆕 What's New
 
+### v5.5.66 — Private outbound call plans
+
+- Keep outbound call metadata owner-only. Pending plans can survive a bridge restart during the ten-minute call setup window.
+- Prune expired structured plans on startup and once a minute while running. Keep call routing and objectives for dashboard history.
+
 ### v5.5.65 — Enforce CRM opt-in before loading
 
 - Check operator opt-in before loading the voice CRM handler.
