@@ -22,7 +22,7 @@ For documentation consistency (but doesn't affect ClawHub display).
 
 ### Description (frontmatter in SKILL.md)
 ```
-"Inbound calls, confirmed outbound calls, transcripts, calendar booking, optional CRM, and opt-in Apple Contacts lookup through MCP."
+"Inbound and confirmed outbound calls, transcripts, booking, opt-in CRM, Apple Contacts export, operator messages, approved skills, optional macOS watcher."
 ```
 
 Must be exactly 155 characters or less.

@@ -1,7 +1,7 @@
 ---
 name: amber-voice-assistant
 title: "Amber — Give Your Agent Real Phone Capabilities"
-description: "Inbound calls, confirmed outbound calls, transcripts, calendar booking, optional CRM, and opt-in Apple Contacts lookup through MCP."
+description: "Inbound and confirmed outbound calls, transcripts, booking, opt-in CRM, Apple Contacts export, operator messages, approved skills, optional macOS watcher."
 homepage: https://github.com/batthis/amber-openclaw-voice-agent
 metadata: {"openclaw":{"emoji":"☎️","requires":{"env":[],"optionalEnv":["AMBER_ENABLE_OUTBOUND_CALLS","AMBER_REALTIME_MODEL","AMBER_REALTIME_VAD_THRESHOLD","AMBER_REALTIME_VAD_PREFIX_PADDING_MS","AMBER_REALTIME_VAD_SILENCE_DURATION_MS","AMBER_CRM_ENABLED","AMBER_CRM_TRANSCRIPT_ENRICHMENT","OPENCLAW_GATEWAY_URL","TWILIO_WEBHOOK_STRICT","VOICE_PROVIDER","VOICE_WEBHOOK_SECRET","ASSISTANT_NAME","OPERATOR_NAME","AMBER_CRM_DB_PATH","AGENT_MD_PATH","DEFAULT_CALENDAR","AMBER_CONTACTS_EXTENDED"],"anyBins":["node","ical-query"]},"permissions":{"network":true,"env":true,"webhooks":true,"localFiles":["runtime/logs/","runtime/contacts-cache.json","~/.config/amber/crm.sqlite"],"localBinaries":["node","ical-query"],"mcpTools":["make_call","get_call_status","get_call_history","crm","contacts_lookup","calendar_query","start_screening","stop_screening","bridge_health"],"externalServices":["Twilio","OpenAI Realtime/API","optional OpenClaw Gateway"]},"install":[{"id":"runtime","kind":"node","cwd":"runtime","label":"Install Amber runtime (cd runtime && npm ci && npm run build)"},{"id":"crm-skill","kind":"node","cwd":"amber-skills/crm","label":"Install optional CRM skill dependencies (cd amber-skills/crm && npm ci)"}]}}
 ---
